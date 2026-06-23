@@ -1,11 +1,5 @@
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
 import "./globals.css";
-
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  variable: "--font-montserrat",
-});
 
 export const metadata: Metadata = {
   title: "CREATIQ | Digital Solutions for the Future",
@@ -24,11 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body
-        className={`${montserrat.variable} bg-background text-foreground antialiased`}
-      >
-        {children}
-      </body>
+      <body className="bg-background text-foreground antialiased">{children}</body>
     </html>
   );
 }

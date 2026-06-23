@@ -155,35 +155,59 @@ export function HeroBackground() {
     let mouseX = 0;
     let mouseY = 0;
     let animationFrame = 0;
+    let canvasWidth = 0;
+    let canvasHeight = 0;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
     const handleMouseMove = (event: MouseEvent) => {
       mouseX = event.clientX;
       mouseY = event.clientY;
     };
 
-    const render = (time: number) => {
+    const resize = () => {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const nextWidth = Math.floor(width * pixelRatio);
+      const nextHeight = Math.floor(height * pixelRatio);
 
-      canvas.width = width;
-      canvas.height = height;
+      if (canvasWidth === nextWidth && canvasHeight === nextHeight) return;
 
-      gl.viewport(0, 0, width, height);
+      canvasWidth = nextWidth;
+      canvasHeight = nextHeight;
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+      gl.viewport(0, 0, nextWidth, nextHeight);
+    };
 
-      gl.uniform1f(timeLocation, time * 0.001);
-      gl.uniform2f(resolutionLocation, width, height);
-      gl.uniform2f(mouseLocation, mouseX, mouseY);
+    const render = (time: number) => {
+      resize();
+
+      gl.uniform1f(timeLocation, prefersReducedMotion ? 0 : time * 0.001);
+      gl.uniform2f(resolutionLocation, canvasWidth, canvasHeight);
+      gl.uniform2f(
+        mouseLocation,
+        mouseX * Math.min(window.devicePixelRatio || 1, 2),
+        mouseY * Math.min(window.devicePixelRatio || 1, 2),
+      );
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      animationFrame = requestAnimationFrame(render);
+      if (!prefersReducedMotion) {
+        animationFrame = requestAnimationFrame(render);
+      }
     };
 
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
     window.addEventListener("mousemove", handleMouseMove);
-    animationFrame = requestAnimationFrame(render);
+    render(0);
 
     return () => {
       cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
       window.removeEventListener("mousemove", handleMouseMove);
       gl.deleteProgram(program);
       gl.deleteShader(vertexShader);
