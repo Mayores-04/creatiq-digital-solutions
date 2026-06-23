@@ -120,7 +120,7 @@ function HeroShowcase() {
             <div className="grid gap-3 p-4">
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  ["Projects", "18"],
+                  ["Projects", "24"],
                   ["Leads", "42"],
                   ["Growth", "96%"],
                 ].map(([label, value]) => (
