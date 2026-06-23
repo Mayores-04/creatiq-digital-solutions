@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { PwaRegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
   title: "CREATIQ | Digital Solutions for the Future",
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark scroll-smooth">
       <body className="bg-background text-foreground antialiased">
+        <PwaRegister />
         {children}
         <Toaster
           position="top-right"
@@ -28,7 +30,8 @@ export default function RootLayout({
           closeButton
           toastOptions={{
             classNames: {
-              toast: "border border-cyan-300/30 bg-surface text-foreground shadow-[0_0_30px_rgba(8,189,255,0.2)]",
+              toast:
+                "border border-cyan-300/30 bg-surface text-foreground shadow-[0_0_30px_rgba(8,189,255,0.2)]",
               title: "font-semibold text-primary",
               description: "text-muted",
             },
