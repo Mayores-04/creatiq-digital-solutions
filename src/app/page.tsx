@@ -744,89 +744,147 @@ function ProcessSection() {
 
 function ContactSection() {
   return (
-    <section id="contact" className="relative py-28 md:py-32">
-      <div className="relative z-10 mx-auto max-w-7xl px-5 md:px-8 lg:px-16">
-        <div className="glass-card mx-auto grid max-w-4xl grid-cols-1 overflow-hidden rounded-3xl lg:grid-cols-5">
-          <div className="flex flex-col justify-between bg-[#0034d2] p-8 text-primary lg:col-span-2 lg:p-12">
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold md:text-4xl">
-                Let&apos;s build something epic.
-              </h2>
-              <p className="leading-7">
-                Fill out the form and we&apos;ll get back to you for your
-                project details.
-              </p>
-            </div>
+    <section id="contact" className="relative overflow-hidden py-28 md:py-32">
+      <div className="absolute left-1/2 top-1/2 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/10 blur-[120px]" />
+      <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-[90px]" />
 
-            <div className="mt-10 space-y-4">
-              <div className="flex items-center gap-3">
-                <Mail size={20} />
-                <span>jakemayores05@gmail.com</span>
+      <div className="relative z-10 mx-auto max-w-6xl px-5 md:px-8 lg:px-16">
+        <div className="mb-12 text-center">
+          <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.24em] text-secondary backdrop-blur-md">
+            <Sparkles size={14} />
+            Start a Project
+          </div>
+
+          <h2 className="text-3xl font-black tracking-[-0.04em] text-primary md:text-5xl">
+            Let&apos;s build something creative.
+          </h2>
+
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted md:text-base">
+            Tell us what you need and we&apos;ll help you plan the best digital
+            solution for your business, brand, or project.
+          </p>
+        </div>
+
+        <div className="glass-card mx-auto grid max-w-5xl grid-cols-1 overflow-hidden rounded-[2rem] border-cyan-300/20 shadow-[0_0_70px_rgba(8,189,255,0.12)] lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-[#061a3a] p-8 md:p-10">
+            <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-300/20 blur-[70px]" />
+            <div className="absolute -bottom-20 right-0 h-56 w-56 rounded-full bg-cyan-300/10 blur-[80px]" />
+
+            <div className="relative flex h-full min-h-[420px] flex-col justify-between">
+              <div>
+                <div className="mb-8 flex items-center gap-3">
+                  <Image
+                    src={brand.iconDark}
+                    alt="Creatiq icon"
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 rounded-2xl object-contain shadow-[0_0_30px_rgba(8,189,255,0.25)]"
+                  />
+
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200">
+                      Creatiq
+                    </p>
+                    <p className="text-sm font-semibold text-white/80">
+                      Digital Solutions
+                    </p>
+                  </div>
+                </div>
+
+                <h3 className="max-w-sm text-3xl font-black leading-tight tracking-[-0.04em] text-white md:text-4xl">
+                  Ready to turn your idea into a real digital product?
+                </h3>
+
+                <p className="mt-5 max-w-sm text-sm leading-7 text-cyan-50/80">
+                  From websites and systems to branding and marketing creatives,
+                  we&apos;ll help you create something clean, modern, and
+                  useful.
+                </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <MapPin size={20} />
-                <span>Cainta, Rizal</span>
+              <div className="space-y-4">
+                <a
+                  href="mailto:jakemayores05@gmail.com"
+                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-white/90 backdrop-blur-md transition hover:bg-white/15"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-cyan-200">
+                    <Mail size={18} />
+                  </span>
+                  <span>jakemayores05@gmail.com</span>
+                </a>
+
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-white/90 backdrop-blur-md">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-cyan-200">
+                    <MapPin size={18} />
+                  </span>
+                  <span>Cainta, Rizal</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="p-8 lg:col-span-3 lg:p-12">
+          <div className="bg-[#07152d]/80 p-8 md:p-10">
             <form className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
                     Your Name
                   </label>
                   <input
-                    className="input-line"
-                    placeholder="John Doe"
                     type="text"
+                    placeholder="John Doe"
+                    className="h-13 w-full rounded-2xl border border-cyan-300/15 bg-background/70 px-4 text-sm text-primary outline-none transition placeholder:text-muted/55 focus:border-secondary focus:bg-background focus:shadow-[0_0_0_4px_rgba(8,189,255,0.08)]"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
                     Email Address
                   </label>
                   <input
-                    className="input-line"
-                    placeholder="john@example.com"
                     type="email"
+                    placeholder="john@example.com"
+                    className="h-13 w-full rounded-2xl border border-cyan-300/15 bg-background/70 px-4 text-sm text-primary outline-none transition placeholder:text-muted/55 focus:border-secondary focus:bg-background focus:shadow-[0_0_0_4px_rgba(8,189,255,0.08)]"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+                <label className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
                   Service Needed
                 </label>
-                <select className="input-line">
+                <select className="h-13 w-full rounded-2xl border border-cyan-300/15 bg-background/70 px-4 text-sm text-primary outline-none transition focus:border-secondary focus:bg-background focus:shadow-[0_0_0_4px_rgba(8,189,255,0.08)]">
                   <option>Web Development</option>
-                  <option>Custom System</option>
-                  <option>Mobile App</option>
-                  <option>Brand Identity</option>
+                  <option>Custom Web-Based System</option>
+                  <option>Mobile App Development</option>
+                  <option>UI/UX Design</option>
+                  <option>Branding & Logo Design</option>
                   <option>Graphic Design</option>
-                  <option>Digital Marketing</option>
+                  <option>Social Media Creatives</option>
+                  <option>Digital Marketing Materials</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-secondary">
+                <label className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
                   Project Description
                 </label>
                 <textarea
-                  className="input-line min-h-[120px]"
                   placeholder="Tell us about your project..."
+                  className="min-h-[150px] w-full resize-none rounded-2xl border border-cyan-300/15 bg-background/70 px-4 py-4 text-sm text-primary outline-none transition placeholder:text-muted/55 focus:border-secondary focus:bg-background focus:shadow-[0_0_0_4px_rgba(8,189,255,0.08)]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="primary-btn mt-4 w-full rounded-xl py-4 font-bold uppercase tracking-widest text-white shadow-xl"
+                className="primary-btn flex h-14 w-full items-center justify-center rounded-2xl text-xs font-black uppercase tracking-[0.22em] text-white shadow-[0_0_30px_rgba(8,189,255,0.18)]"
               >
                 Send Inquiry
               </button>
+
+              <p className="text-center text-xs leading-6 text-muted/70">
+                We&apos;ll review your inquiry and reply as soon as possible.
+              </p>
             </form>
           </div>
         </div>
