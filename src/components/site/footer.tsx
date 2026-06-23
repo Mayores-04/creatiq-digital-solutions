@@ -29,14 +29,21 @@ const columns = [
       { label: "Privacy Policy", href: "/privacy" },
       { label: "Terms of Service", href: "/terms" },
       { label: "Cookie Settings", href: "/cookies" },
-      { label: "Contact Support", href: "mailto:creatiq.digitalsolutions@gmail.com" },
+      {
+        label: "Contact Support",
+        href: "mailto:creatiq.digitalsolutions@gmail.com",
+      },
     ],
   },
 ];
 
 const socialLinks = [
   { label: "Visit Creatiq home", href: "/", icon: Globe2 },
-  { label: "Email Creatiq", href: "mailto:creatiq.digitalsolutions@gmail.com", icon: AtSign },
+  {
+    label: "Email Creatiq",
+    href: "mailto:creatiq.digitalsolutions@gmail.com",
+    icon: AtSign,
+  },
   { label: "Start a project", href: "/#contact", icon: Share2 },
 ];
 
@@ -46,14 +53,26 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-10 xl:px-16">
         <div className="space-y-4">
           <Link href="/" aria-label="Creatiq home" className="inline-flex">
-            <Image src={brand.landscape} alt="Creatiq Digital Solutions" width={280} height={100} className="h-14 w-auto object-contain sm:h-16" />
+            <Image
+              src={brand.landscape}
+              alt="Creatiq Digital Solutions"
+              width={280}
+              height={100}
+              className="h-16 w-auto object-contain sm:h-20 xl:h-[5.5rem]"
+            />
           </Link>
           <p className="max-w-xs text-sm leading-6 text-muted">
-            Engineering the future of digital presence through visionary design and high-performance technology.
+            Engineering the future of digital presence through visionary design
+            and high-performance technology.
           </p>
           <div className="flex gap-3 text-muted">
             {socialLinks.map(({ label, href, icon: Icon }) => (
-              <FooterLink key={label} href={href} label={label} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/15 transition hover:border-cyan-300/50 hover:bg-cyan-300/10 hover:text-secondary">
+              <FooterLink
+                key={label}
+                href={href}
+                label={label}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/15 transition hover:border-cyan-300/50 hover:bg-cyan-300/10 hover:text-secondary"
+              >
                 <Icon size={18} />
               </FooterLink>
             ))}
@@ -62,11 +81,16 @@ export function Footer() {
 
         {columns.map((column) => (
           <div key={column.title} className="space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-secondary">{column.title}</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-secondary">
+              {column.title}
+            </h2>
             <ul className="space-y-2 text-sm text-muted">
               {column.links.map((link) => (
                 <li key={link.label}>
-                  <FooterLink href={link.href} className="transition hover:text-secondary">
+                  <FooterLink
+                    href={link.href}
+                    className="transition hover:text-secondary"
+                  >
                     {link.label}
                   </FooterLink>
                 </li>
@@ -94,8 +118,16 @@ function FooterLink({
   label?: string;
 }) {
   if (href.startsWith("mailto:")) {
-    return <a href={href} aria-label={label} className={className}>{children}</a>;
+    return (
+      <a href={href} aria-label={label} className={className}>
+        {children}
+      </a>
+    );
   }
 
-  return <Link href={href} aria-label={label} className={className}>{children}</Link>;
+  return (
+    <Link href={href} aria-label={label} className={className}>
+      {children}
+    </Link>
+  );
 }

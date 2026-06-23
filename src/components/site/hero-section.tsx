@@ -14,11 +14,11 @@ export function HeroSection() {
   return (
     <section
       id="home"
-      className="relative flex min-h-[44rem] items-center overflow-hidden pt-16 lg:min-h-screen lg:pt-20"
+      className="relative flex min-h-[44rem] items-center overflow-hidden pt-[4.5rem] sm:pt-20 lg:min-h-screen lg:pt-24"
     >
       <HeroBackground />
       <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_20%_20%,rgba(8,189,255,0.18),transparent_28rem),linear-gradient(180deg,rgba(2,11,31,0.15),#020b1f_92%)]" />
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:min-h-[calc(100vh-5rem)] lg:grid-cols-2 lg:gap-14 lg:px-10 xl:px-16">
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:min-h-[calc(100vh-6rem)] lg:grid-cols-2 lg:gap-14 lg:px-10 xl:px-16">
         <div className="max-w-xl space-y-6">
           <div className="animate-fade-in-up inline-flex max-w-full items-center gap-2.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3.5 py-1.5 shadow-[0_0_24px_rgba(8,189,255,0.12)] backdrop-blur-md">
             <Image
