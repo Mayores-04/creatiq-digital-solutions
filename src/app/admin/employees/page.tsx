@@ -1,0 +1,8 @@
+import { ResourceManager, type ResourceRow } from "@/components/admin/resource-manager";
+import { getAdminWorkspace } from "@/lib/crm/admin-data";
+
+export default async function EmployeesPage() {
+  const workspace = await getAdminWorkspace();
+  if (workspace.identity.role === "STAFF") return <section><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">Team directory</p><h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">Employees</h1><p className="mt-2 text-sm text-muted">The people building Creatiq&apos;s client work.</p><div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{workspace.profiles.map((profile) => <article key={profile.id} className="rounded-2xl border border-cyan-300/15 bg-surface/60 p-5"><p className="font-black text-primary">{profile.full_name}</p><p className="mt-1 text-sm text-secondary">{profile.job_title || "Creatiq team member"}</p><p className="mt-3 text-xs text-muted">{profile.email}</p></article>)}</div></section>;
+  return <ResourceManager resource="employees" title="Employees" description="Maintain the active staff directory and the role context used when assigning project work." rows={workspace.profiles as unknown as ResourceRow[]} columns={[{ key: "full_name", label: "Name" }, { key: "job_title", label: "Role" }, { key: "email", label: "Email" }, { key: "role", label: "Access", kind: "status" }, { key: "is_active", label: "Active" }]} fields={[{ name: "full_name", label: "Full name", required: true }, { name: "job_title", label: "Job title" }, { name: "is_active", label: "Active team member", type: "checkbox", defaultValue: true }]} />;
+}

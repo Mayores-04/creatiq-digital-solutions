@@ -8,20 +8,22 @@ import { ProcessSection } from "@/components/site/process-section";
 import { ServicesSection } from "@/components/site/services-section";
 import { SolutionsSection } from "@/components/site/solutions-section";
 import { WhyChooseUsSection } from "@/components/site/why-choose-us-section";
+import { getPublicSiteData } from "@/lib/crm/public-data";
 
-export default function Home() {
+export default async function Home() {
+  const { settings, services, portfolio } = await getPublicSiteData();
   return (
     <main className="relative min-h-screen overflow-x-clip">
-      <Header />
+      <Header settings={settings} />
       <HeroSection />
       <AboutSection />
-      <ServicesSection />
+      <ServicesSection services={services} />
       <SolutionsSection />
-      <PortfolioSection />
+      <PortfolioSection projects={portfolio} />
       <WhyChooseUsSection />
       <ProcessSection />
-      <ContactSection />
-      <Footer />
+      <ContactSection settings={settings} services={services} />
+      <Footer settings={settings} />
     </main>
   );
 }

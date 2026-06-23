@@ -1,5 +1,7 @@
 import nodemailer from "nodemailer";
+import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getSupabaseConfig, hasSupabaseConfig } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 
@@ -134,6 +136,29 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   }
 
+  if (!hasSupabaseConfig()) {
+    console.error("Inquiry CRM persistence is not configured.");
+    return Response.json({ error: "Inquiry service is temporarily unavailable." }, { status: 503 });
+  }
+
+  try {
+    const { url, publishableKey } = getSupabaseConfig();
+    const crm = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { error } = await crm.rpc("submit_website_inquiry", {
+      inquiry_name: name,
+      inquiry_email: email,
+      inquiry_services: services,
+      inquiry_description: description,
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.error("Unable to save website inquiry:", error);
+    return Response.json(
+      { error: "We could not save your inquiry. Please try again shortly." },
+      { status: 503 },
+    );
+  }
+
   const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: Number(process.env.SMTP_PORT ?? 465),
@@ -154,7 +179,7 @@ export async function POST(request: Request) {
   try {
     await transporter.sendMail({
       from: `Creatiq Website <${smtpUser}>`,
-      to: process.env.INQUIRY_TO ?? smtpUser,
+      to: process.env.INQUIRY_TO ?? "creatiq.digitalsolutions@gmail.com",
       replyTo: email,
       subject: `New Creatiq inquiry: ${serviceSummary}`,
       text: [

@@ -1,36 +1,17 @@
 "use client";
 
-import {
-  BadgeCheck,
-  Brush,
-  Check,
-  Code2,
-  LayoutDashboard,
-  PenTool,
-  Share2,
-  Smartphone,
-  Video,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import type { PublicService } from "@/lib/crm/public-data";
+import { getServiceIcon } from "./service-icons";
 
 const inputClass =
   "h-12 w-full rounded-2xl border border-cyan-300/15 bg-background/70 px-4 text-sm text-primary outline-none transition placeholder:text-muted/55 focus:border-secondary focus:bg-background focus:shadow-[0_0_0_4px_rgba(8,189,255,0.08)]";
 
 type SubmissionState = "idle" | "sending" | "sent" | "error";
 
-const serviceOptions = [
-  { title: "Web Development", icon: Code2 },
-  { title: "Custom Web System", icon: LayoutDashboard },
-  { title: "Mobile App", icon: Smartphone },
-  { title: "UI/UX Design", icon: PenTool },
-  { title: "Branding & Logo", icon: BadgeCheck },
-  { title: "Graphic Design", icon: Brush },
-  { title: "Social Media", icon: Share2 },
-  { title: "Video Editing", icon: Video },
-];
-
-export function InquiryForm() {
+export function InquiryForm({ services }: { services: PublicService[] }) {
   const [state, setState] = useState<SubmissionState>("idle");
   const [message, setMessage] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -118,8 +99,8 @@ export function InquiryForm() {
             </div>
 
             <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
-              {serviceOptions.map((service) => {
-                const Icon = service.icon;
+              {services.map((service) => {
+                const Icon = getServiceIcon(service.icon_name);
                 const isSelected = selectedServices.includes(service.title);
 
                 return (

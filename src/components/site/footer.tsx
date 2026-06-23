@@ -3,6 +3,8 @@ import Link from "next/link";
 import { AtSign, Globe2, Share2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { brand } from "./brand";
+import type { PublicCompanySettings } from "@/lib/crm/public-data";
+import { DEFAULT_COMPANY_SETTINGS } from "@/lib/crm/constants";
 
 const columns = [
   {
@@ -37,28 +39,34 @@ const columns = [
   },
 ];
 
-const socialLinks = [
-  { label: "Visit Creatiq home", href: "/", icon: Globe2 },
-  {
-    label: "Email Creatiq",
-    href: "mailto:creatiq.digitalsolutions@gmail.com",
-    icon: AtSign,
-  },
-  { label: "Start a project", href: "/#contact", icon: Share2 },
-];
-
-export function Footer() {
+export function Footer({
+  settings = DEFAULT_COMPANY_SETTINGS,
+}: {
+  settings?: PublicCompanySettings;
+}) {
+  const publicEmail = settings.company_email;
+  const socialLinks = [
+    { label: "Visit Creatiq home", href: "/", icon: Globe2 },
+    { label: "Email Creatiq", href: `mailto:${publicEmail}`, icon: AtSign },
+    ...Object.entries(settings.social_links)
+      .filter(([, href]) => href)
+      .map(([network, href]) => ({
+        label: `Visit Creatiq on ${network}`,
+        href,
+        icon: Share2,
+      })),
+  ];
   return (
     <footer className="border-t border-white/10 bg-background py-12 sm:py-16">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-10 xl:px-16">
         <div className="space-y-4">
           <Link href="/" aria-label="Creatiq home" className="inline-flex">
             <Image
-              src={brand.landscape}
-              alt="Creatiq Digital Solutions"
+              src={settings.logo_url || brand.landscape}
+              alt={settings.company_name}
               width={280}
               height={100}
-              className="h-16 w-auto object-contain sm:h-20 xl:h-[5.5rem]"
+              className="h-16 w-auto object-contain sm:h-20 ml-[-0.5rem]"
             />
           </Link>
           <p className="max-w-xs text-sm leading-6 text-muted">
@@ -88,7 +96,11 @@ export function Footer() {
               {column.links.map((link) => (
                 <li key={link.label}>
                   <FooterLink
-                    href={link.href}
+                    href={
+                      link.href === "mailto:creatiq.digitalsolutions@gmail.com"
+                        ? `mailto:${publicEmail}`
+                        : link.href
+                    }
                     className="transition hover:text-secondary"
                   >
                     {link.label}
@@ -100,7 +112,7 @@ export function Footer() {
         ))}
       </div>
       <div className="mx-auto mt-12 max-w-7xl border-t border-white/10 px-4 pt-8 text-center text-xs text-muted/70 sm:mt-16 sm:px-6 lg:px-10 xl:px-16">
-        &copy; 2026 Creatiq Digital Solutions. Engineered for the future.
+        &copy; 2026 {settings.company_name}. Engineered for the future.
       </div>
     </footer>
   );
@@ -117,9 +129,19 @@ function FooterLink({
   className?: string;
   label?: string;
 }) {
-  if (href.startsWith("mailto:")) {
+  if (
+    href.startsWith("mailto:") ||
+    href.startsWith("http://") ||
+    href.startsWith("https://")
+  ) {
     return (
-      <a href={href} aria-label={label} className={className}>
+      <a
+        href={href}
+        aria-label={label}
+        className={className}
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noreferrer" : undefined}
+      >
         {children}
       </a>
     );

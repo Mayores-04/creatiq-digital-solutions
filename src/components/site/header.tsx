@@ -4,8 +4,9 @@ import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { brand, navigationLinks } from "./brand";
+import type { PublicCompanySettings } from "@/lib/crm/public-data";
 
-export function Header() {
+export function Header({ settings }: { settings: PublicCompanySettings }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeHref, setActiveHref] = useState("#services");
 
@@ -40,12 +41,12 @@ export function Header() {
           aria-label="Creatiq home"
         >
           <Image
-            src={brand.landscape}
-            alt="Creatiq Digital Solutions"
+            src={settings.logo_url || brand.landscape}
+            alt={settings.company_name}
             width={260}
             height={90}
             priority
-            className="h-12 w-auto object-contain sm:h-14 lg:h-20 xl:h-[5.5rem]"
+            className="h-12 w-auto object-contain sm:h-14 lg:h-14 ml-[-0.5rem]"
           />
         </a>
 
