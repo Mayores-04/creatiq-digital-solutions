@@ -1,0 +1,7 @@
+import { Quote, Star } from "lucide-react";
+import type { PublicReview } from "@/lib/crm/public-data";
+
+export function ReviewsSection({ reviews }: { reviews: PublicReview[] }) {
+  if (!reviews.length) return null;
+  return <section id="reviews" className="bg-surface-low/25 py-20 sm:py-24 lg:py-32"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10 xl:px-16"><div className="max-w-2xl"><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">Client voices</p><h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">Trusted by people we&apos;ve built with.</h2><p className="mt-3 text-sm leading-6 text-muted">Every review is collected privately and published only after Creatiq&apos;s team has reviewed it.</p></div><div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{reviews.slice(0, 6).map((review, index) => <article key={`${review.customer_name}-${index}`} className="glass-card rounded-2xl p-6"><Quote className="text-secondary" size={24} /><div className="mt-5 flex gap-1 text-amber-200">{Array.from({ length: review.rating }, (_, star) => <Star key={star} size={15} fill="currentColor" />)}</div><p className="mt-4 text-sm leading-7 text-muted">“{review.testimonial}”</p><div className="mt-6 border-t border-cyan-300/10 pt-4"><p className="font-bold text-primary">{review.customer_name}</p>{review.project_name && <p className="mt-1 text-xs text-secondary">{review.project_name}</p>}</div></article>)}</div></div></section>;
+}

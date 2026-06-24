@@ -36,6 +36,7 @@ export type InquiryRecord = {
 
 export type ProjectRecord = {
   id: string;
+  slug: string | null;
   client_id: string | null;
   inquiry_id: string | null;
   name: string;
@@ -45,6 +46,20 @@ export type ProjectRecord = {
   start_date: string | null;
   due_date: string | null;
   completed_at: string | null;
+  category: string | null;
+  project_type: "PERSONAL" | "CLIENT" | "TEAM";
+  lead_outcome: "OPEN" | "WON" | "LOST";
+  lost_reason: string | null;
+  is_published: boolean;
+  is_featured: boolean;
+  image_url: string | null;
+  image_public_id: string | null;
+  project_url: string | null;
+  technologies: string[];
+  project_date: string | null;
+  asset_size: string | null;
+  source_image_path: string | null;
+  sort_order: number;
   created_at: string;
 };
 
@@ -80,22 +95,29 @@ export type ServiceRecord = {
   is_published: boolean;
 };
 
-export type PortfolioRecord = {
+export type ProjectContributorRecord = {
   id: string;
-  slug: string;
-  title: string;
-  category: string;
-  summary: string;
-  image_url: string | null;
-  image_public_id: string | null;
-  project_url: string | null;
-  technologies: string[];
-  project_date: string | null;
-  asset_size: string | null;
-  source_image_path: string | null;
-  is_published: boolean;
-  is_featured: boolean;
-  sort_order: number;
+  project_id: string;
+  profile_id: string | null;
+  external_name: string | null;
+  external_email: string | null;
+  contribution_role: string | null;
+};
+
+export type CustomerReviewRecord = {
+  id: string;
+  request_token: string;
+  client_id: string | null;
+  project_id: string | null;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  rating: number | null;
+  testimonial: string | null;
+  status: "REQUESTED" | "PENDING" | "APPROVED" | "REJECTED";
+  submitted_at: string | null;
+  created_at: string;
 };
 
 export type ActivityRecord = {
@@ -124,10 +146,11 @@ export type AdminWorkspace = {
   inquiries: InquiryRecord[];
   projects: ProjectRecord[];
   projectMembers: { project_id: string; profile_id: string }[];
+  contributors: ProjectContributorRecord[];
   tasks: TaskRecord[];
   documents: ProjectDocumentRecord[];
   services: ServiceRecord[];
-  portfolio: PortfolioRecord[];
+  reviews: CustomerReviewRecord[];
   activity: ActivityRecord[];
   settings: CompanySettingsRecord | null;
 };

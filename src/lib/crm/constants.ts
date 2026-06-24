@@ -1,9 +1,12 @@
-export const ADMIN_ROLES = ["OWNER", "STAFF"] as const;
+export const ADMIN_ROLES = ["ADMIN", "STAFF"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export const INQUIRY_STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "CLOSED"] as const;
 export const PROJECT_STATUSES = ["LEAD", "PLANNING", "ACTIVE", "REVIEW", "COMPLETED", "ON_HOLD"] as const;
 export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "DONE"] as const;
+export const PROJECT_TYPES = ["PERSONAL", "CLIENT", "TEAM"] as const;
+export const LEAD_OUTCOMES = ["OPEN", "WON", "LOST"] as const;
+export const REVIEW_STATUSES = ["REQUESTED", "PENDING", "APPROVED", "REJECTED"] as const;
 
 export const DEFAULT_COMPANY_SETTINGS = {
   company_name: "Creatiq Digital Solutions",

@@ -45,7 +45,7 @@ export function Header({ settings }: { settings: PublicCompanySettings }) {
             alt={settings.company_name}
             width={260}
             height={90}
-            priority
+            loading="eager"
             className="h-12 w-auto object-contain sm:h-14 lg:h-14 ml-[-0.5rem]"
           />
         </a>

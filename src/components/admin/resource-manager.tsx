@@ -9,6 +9,7 @@ import type { SelectOption } from "@/lib/crm/types";
 
 type FieldType = "text" | "email" | "textarea" | "select" | "date" | "number" | "checkbox" | "multi-select" | "image-upload";
 type FieldValue = string | number | boolean | string[] | null | undefined;
+type EditorMode = "panel" | "modal";
 export type ResourceRow = { id: string; [key: string]: unknown };
 
 export type ResourceField = {
@@ -67,6 +68,8 @@ export function ResourceManager({
   canCreate = false,
   canDelete = false,
   emptyMessage = "No records yet.",
+  editorMode = "panel",
+  currentUserId,
 }: {
   resource: CrmResource;
   title: string;
@@ -77,17 +80,21 @@ export function ResourceManager({
   canCreate?: boolean;
   canDelete?: boolean;
   emptyMessage?: string;
+  editorMode?: EditorMode;
+  currentUserId?: string;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<ResourceRow | null>(null);
   const [form, setForm] = useState<Record<string, FieldValue>>(() => emptyValues(fields));
   const [busy, setBusy] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const isCreating = selected === null;
   const formTitle = isCreating ? `New ${title.slice(0, -1)}` : `Edit ${title.slice(0, -1)}`;
   const mobileStatusColumn = columns.find((column) => column.kind === "status");
 
   function selectRow(row: ResourceRow) {
     setSelected(row);
+    setEditorOpen(true);
     setForm(fields.reduce<Record<string, FieldValue>>((values, field) => {
       values[field.name] = valueForField(row, field);
       return values;
@@ -95,6 +102,13 @@ export function ResourceManager({
   }
 
   function newRecord() {
+    setSelected(null);
+    setForm(emptyValues(fields));
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
     setSelected(null);
     setForm(emptyValues(fields));
   }
@@ -105,8 +119,21 @@ export function ResourceManager({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    let values = form;
+    if (resource === "employees" && selected) {
+      const isDeactivating = form.is_active === false;
+      if (isDeactivating && selected.id === currentUserId) {
+        toast.error("You cannot deactivate your own account", { description: "Ask another Admin to change your access if needed." });
+        return;
+      }
+      if (isDeactivating && selected.role === "ADMIN") {
+        const confirmed = window.confirm(`Deactivate co-admin ${asText(selected.full_name)}? They will lose CRM access until another Admin reactivates them.`);
+        if (!confirmed) return;
+        values = { ...form, confirm_co_admin_inactivation: true };
+      }
+    }
     setBusy(true);
-    const result = await saveCrmRecord({ resource, id: selected?.id, values: form });
+    const result = await saveCrmRecord({ resource, id: selected?.id, values });
     setBusy(false);
     if (!result.ok) {
       toast.error("Couldn’t save", { description: result.error });
@@ -114,7 +141,8 @@ export function ResourceManager({
     }
     toast.success(result.message);
     router.refresh();
-    if (isCreating) newRecord();
+    if (editorMode === "modal") closeEditor();
+    else if (isCreating) newRecord();
   }
 
   async function remove() {
@@ -127,9 +155,17 @@ export function ResourceManager({
       return;
     }
     toast.success(result.message);
-    newRecord();
+    closeEditor();
     router.refresh();
   }
+
+  const editorForm = <form onSubmit={submit} className={`${editorMode === "modal" ? "w-full" : "h-fit"} rounded-2xl border border-cyan-300/20 bg-surface p-4 shadow-[0_0_34px_rgba(8,189,255,0.06)] sm:p-5`}>
+    <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">{isCreating ? "Create record" : "Update record"}</p><h2 className="mt-1 text-lg font-black text-primary">{formTitle}</h2></div>{(!isCreating || editorMode === "modal") && <button type="button" onClick={closeEditor} className="rounded-lg p-2 text-muted hover:bg-cyan-300/10 hover:text-secondary" aria-label="Close editor"><X size={16} /></button>}</div>
+    <div className="mt-5 space-y-3">
+      {fields.map((field) => <Field key={field.name} field={field} value={form[field.name]} onChange={(value) => setField(field.name, value)} />)}
+    </div>
+    <div className="mt-5 flex gap-2"><button disabled={busy} className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60"><Save size={15} />{busy ? "Saving..." : "Save"}</button>{canDelete && !isCreating && <button disabled={busy} onClick={remove} type="button" className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-300/30 text-red-200 transition hover:bg-red-300/10 disabled:opacity-60" aria-label="Delete record"><Trash2 size={16} /></button>}</div>
+  </form>;
 
   return (
     <section className="space-y-5">
@@ -142,13 +178,13 @@ export function ResourceManager({
         {canCreate && <button type="button" onClick={newRecord} className="primary-btn inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black uppercase tracking-widest text-white"><Plus size={16} /> Add {title.slice(0, -1)}</button>}
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className={editorMode === "modal" ? "" : "grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"}>
         <div className="overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60">
           {rows.length === 0 ? (
             <div className="p-10 text-center text-sm text-muted">{emptyMessage}</div>
           ) : (
             <>
-              <div className="divide-y divide-cyan-300/10 md:hidden">
+              <div className="max-h-[34rem] divide-y divide-cyan-300/10 overflow-y-auto md:hidden">
                 {rows.map((row) => (
                   <button key={row.id} type="button" onClick={() => selectRow(row)} className={`block w-full p-4 text-left transition ${selected?.id === row.id ? "bg-cyan-300/10" : "hover:bg-cyan-300/5"}`}>
                     <div className="flex items-start justify-between gap-3"><p className="font-bold text-primary">{asText(row[columns[0]?.key])}</p>{mobileStatusColumn && <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusClass(row[mobileStatusColumn.key])}`}>{asText(row[mobileStatusColumn.key]).replaceAll("_", " ")}</span>}</div>
@@ -156,7 +192,7 @@ export function ResourceManager({
                   </button>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden max-h-[34rem] overflow-auto md:block">
                 <table className="w-full min-w-[42rem] text-left text-sm">
                   <thead className="bg-background/30 text-[10px] font-bold uppercase tracking-widest text-secondary"><tr>{columns.map((column) => <th key={column.key} className="px-4 py-3 font-inherit">{column.label}</th>)}<th className="px-4 py-3" aria-label="Edit" /></tr></thead>
                   <tbody className="divide-y divide-cyan-300/10">{rows.map((row) => <tr key={row.id} className={selected?.id === row.id ? "bg-cyan-300/10" : "hover:bg-cyan-300/5"}>{columns.map((column) => <td key={column.key} className="max-w-64 px-4 py-3 align-top text-muted">{column.kind === "status" ? <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${statusClass(row[column.key])}`}>{asText(row[column.key]).replaceAll("_", " ")}</span> : formatCell(row[column.key], column.kind)}</td>)}<td className="px-4 py-3 text-right"><button type="button" onClick={() => selectRow(row)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-secondary transition hover:bg-cyan-300/10" aria-label={`Edit ${asText(row[columns[0]?.key])}`}><Pencil size={15} /></button></td></tr>)}</tbody>
@@ -166,14 +202,9 @@ export function ResourceManager({
           )}
         </div>
 
-        <form onSubmit={submit} className="h-fit rounded-2xl border border-cyan-300/20 bg-surface p-4 shadow-[0_0_34px_rgba(8,189,255,0.06)] sm:p-5">
-          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">{isCreating ? "Create record" : "Update record"}</p><h2 className="mt-1 text-lg font-black text-primary">{formTitle}</h2></div>{!isCreating && <button type="button" onClick={newRecord} className="rounded-lg p-2 text-muted hover:bg-cyan-300/10 hover:text-secondary" aria-label="Close editor"><X size={16} /></button>}</div>
-          <div className="mt-5 space-y-3">
-            {fields.map((field) => <Field key={field.name} field={field} value={form[field.name]} onChange={(value) => setField(field.name, value)} />)}
-          </div>
-          <div className="mt-5 flex gap-2"><button disabled={busy} className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60"><Save size={15} />{busy ? "Saving..." : "Save"}</button>{canDelete && !isCreating && <button disabled={busy} onClick={remove} type="button" className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-300/30 text-red-200 transition hover:bg-red-300/10 disabled:opacity-60" aria-label="Delete record"><Trash2 size={16} /></button>}</div>
-        </form>
+        {editorMode === "panel" && editorForm}
       </div>
+      {editorMode === "modal" && editorOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-3 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={formTitle}><div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl sm:max-h-[calc(100dvh-3rem)]">{editorForm}</div></div>}
     </section>
   );
 }
@@ -201,7 +232,7 @@ function ImageUploadField({ id, field, value, onChange, baseClass }: { id: strin
     setUploading(true);
     const formData = new FormData();
     formData.set("file", file);
-    formData.set("purpose", "portfolio");
+    formData.set("purpose", "project");
     try {
       const response = await fetch("/api/admin/media", { method: "POST", body: formData });
       const result = await response.json() as { url?: string; error?: string };

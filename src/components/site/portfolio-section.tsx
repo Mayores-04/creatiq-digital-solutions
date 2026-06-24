@@ -3,7 +3,7 @@
 import { ArrowLeft, ArrowRight, ExternalLink, ImageIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import type { PublicPortfolioProject } from "@/lib/crm/public-data";
+import type { PublicProject } from "@/lib/crm/public-data";
 
 const backgrounds = [
   "bg-[radial-gradient(circle_at_top,#08bdff,transparent_36%),linear-gradient(135deg,#061a3a,#1b0f44)]",
@@ -16,7 +16,7 @@ const VISIBLE_PROJECTS = 3;
 export function PortfolioSection({
   projects,
 }: {
-  projects: PublicPortfolioProject[];
+  projects: PublicProject[];
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -57,20 +57,20 @@ export function PortfolioSection({
   if (totalProjects === 0) return null;
 
   return (
-    <section id="portfolio" className="bg-background py-20 sm:py-24 lg:py-32">
+    <section id="projects" className="bg-background py-20 sm:py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10 xl:px-16">
         <div className="mb-10 flex flex-col justify-between gap-5 sm:mb-16 sm:flex-row sm:items-end">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
-              Portfolio
+              Projects
             </p>
 
             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-primary md:text-4xl">
-              Our Work
+              Our Projects
             </h2>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-              A glimpse into the digital solutions we build.
+              Personal, client, and team work made by the people behind Creatiq.
             </p>
           </div>
 
@@ -174,6 +174,10 @@ export function PortfolioSection({
                 <h3 className="mt-3 text-xl font-bold text-foreground">
                   {project.title}
                 </h3>
+
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-primary/70">
+                  {project.project_type} project{project.project_date ? ` · ${project.project_date}` : ""}
+                </p>
 
                 <p className="mt-3 min-h-[4.5rem] text-sm leading-6 text-muted">
                   {project.summary}

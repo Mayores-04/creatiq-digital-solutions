@@ -10,7 +10,7 @@ const highlights = [
   ["Brand", "Digital identity"],
 ];
 
-export function HeroSection() {
+export function HeroSection({ stats }: { stats: { projects: number; active: number; won: number; inquiries: number } }) {
   return (
     <section
       id="home"
@@ -52,10 +52,10 @@ export function HeroSection() {
               Start Your Project
             </a>
             <a
-              href="#portfolio"
+              href="#projects"
               className="rounded-xl border border-cyan-300/40 bg-white/[0.02] px-6 py-3.5 text-center text-[11px] font-bold uppercase tracking-widest text-secondary backdrop-blur-md transition hover:bg-cyan-300/10"
             >
-              View Portfolio
+              View Projects
             </a>
           </div>
           <div className="animate-fade-in-up delay-200 grid grid-cols-3 gap-2 pt-2 sm:gap-3">
@@ -74,13 +74,13 @@ export function HeroSection() {
             ))}
           </div>
         </div>
-        <HeroShowcase />
+        <HeroShowcase stats={stats} />
       </div>
     </section>
   );
 }
 
-function HeroShowcase() {
+function HeroShowcase({ stats }: { stats: { projects: number; active: number; won: number; inquiries: number } }) {
   return (
     <div className="relative mx-auto hidden min-h-[480px] w-full max-w-xl items-center justify-center lg:flex">
       <div className="absolute h-[min(34rem,90vw)] w-[min(34rem,90vw)] rounded-full bg-cyan-400/10 blur-[80px]" />
@@ -120,9 +120,9 @@ function HeroShowcase() {
             <div className="grid gap-3 p-4">
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  ["Projects", "24"],
-                  ["Leads", "42"],
-                  ["Growth", "96%"],
+                  ["Projects", String(stats.projects)],
+                  ["Active", String(stats.active)],
+                  ["Won", String(stats.won)],
                 ].map(([label, value]) => (
                   <div
                     key={label}

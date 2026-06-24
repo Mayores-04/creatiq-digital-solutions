@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { AdminRole } from "./constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -12,25 +13,40 @@ export type AdminIdentity = {
 };
 
 export async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Avoid a remote auth request for visitors who have never signed in. This
+  // keeps the /admin redirect immediate when the database is unavailable.
+  const cookieStore = await cookies();
+  const hasSessionCookie = cookieStore.getAll().some((cookie) =>
+    cookie.name.includes("auth-token"),
+  );
 
-  if (!user?.email) return null;
+  if (!hasSessionCookie) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!profile || !profile.is_active) return null;
+    if (!user?.email) return null;
 
-  return {
-    id: user.id,
-    email: user.email,
-    fullName: profile.full_name,
-    role: profile.role as AdminRole,
-  };
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, role, is_active")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile || !profile.is_active) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: profile.full_name,
+      role: profile.role as AdminRole,
+    };
+  } catch {
+    // A local marketing site remains usable when Supabase is offline. The
+    // protected admin route simply redirects to its sign-in screen.
+    return null;
+  }
 }
 
 export async function requireAdmin(allowedRoles?: AdminRole[]) {

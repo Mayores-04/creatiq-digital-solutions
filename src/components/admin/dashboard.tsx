@@ -163,9 +163,9 @@ export function AdminDashboard({ workspace }: { workspace: AdminWorkspace }) {
         <div className="rounded-2xl border border-cyan-300/15 bg-surface/60 p-5 sm:p-6">
           <h2 className="text-lg font-black text-primary">Employee workload</h2>
           <div className="mt-4 space-y-3">
-            {metrics.workload.map((member) => (
+            {metrics.workload.map((member, index) => (
               <div
-                key={member.name}
+                key={`${member.name}-${index}`}
                 className="rounded-xl border border-cyan-300/10 bg-background/25 p-3"
               >
                 <div className="flex items-center justify-between gap-3">

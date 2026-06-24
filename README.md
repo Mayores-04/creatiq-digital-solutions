@@ -4,15 +4,15 @@ Creatiq is a responsive marketing website and secure agency CRM built with Next.
 
 ## What is included
 
-- Public services, portfolio work, company details, and inquiry form.
-- `/admin` CRM for Owner and Staff operations: inquiries, clients, projects, tasks, employees, reports, activity, publishing, and user access.
+- Public services, projects, customer reviews, company details, and inquiry form.
+- `/admin` CRM for Admin and Staff operations: inquiries, clients, unified projects, tasks, employees, reviews, reports, activity, publishing, and user access.
 - Supabase Auth and Row Level Security; there is no public admin registration.
-- Cloudinary public brand/portfolio media and signed private Supabase project-document uploads.
+- Cloudinary public brand/project media and signed private Supabase project-document uploads.
 
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and fill the server-only credentials.
-2. Apply the SQL migration in [supabase/README.md](supabase/README.md), then provision the first Owner.
+2. Apply the SQL migrations in [supabase/README.md](supabase/README.md), then provision the first Admin.
 3. Install and start the app:
 
 ```bash

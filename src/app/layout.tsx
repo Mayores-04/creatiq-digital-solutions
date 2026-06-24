@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { AuthInviteBridge } from "@/components/auth/auth-invite-bridge";
 import { PwaRegister } from "@/components/pwa-register";
 
 export const metadata: Metadata = {
@@ -19,9 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark scroll-smooth">
+    <html lang="en" className="dark scroll-smooth no-scrollbar">
       <body className="bg-background text-foreground antialiased">
         <PwaRegister />
+        <AuthInviteBridge />
         {children}
         <Toaster
           position="top-right"

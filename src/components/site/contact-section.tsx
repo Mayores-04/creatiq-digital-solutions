@@ -2,8 +2,96 @@ import Image from "next/image";
 import { Mail, MapPin, Rocket } from "lucide-react";
 import { brand } from "./brand";
 import { InquiryForm } from "./inquiry-form";
-import type { PublicCompanySettings, PublicService } from "@/lib/crm/public-data";
+import type {
+  PublicCompanySettings,
+  PublicService,
+} from "@/lib/crm/public-data";
 
-export function ContactSection({ settings, services }: { settings: PublicCompanySettings; services: PublicService[] }) { return <section id="contact" className="relative overflow-hidden py-20 sm:py-24 lg:py-32"><div className="absolute left-1/2 top-1/2 h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/10 blur-[120px]" /><div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-10 xl:px-16"><div className="mb-10 text-center sm:mb-12"><div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-secondary backdrop-blur-md"><Rocket size={14} aria-hidden="true" />Start a Project</div><h2 className="text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl md:text-5xl">Let&apos;s build something creative.</h2><p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted md:text-base">Tell us what you need and we&apos;ll help you plan the best digital solution for your business, brand, or project.</p></div><div className="glass-card mx-auto grid max-w-5xl overflow-hidden rounded-[1.5rem] border-cyan-300/20 shadow-[0_0_70px_rgba(8,189,255,0.12)] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[2rem]"><ContactDetails settings={settings} /><InquiryForm services={services} /></div></div></section>; }
+export function ContactSection({
+  settings,
+  services,
+}: {
+  settings: PublicCompanySettings;
+  services: PublicService[];
+}) {
+  return (
+    <section
+      id="contact"
+      className="relative overflow-hidden py-20 sm:py-24 lg:py-32"
+    >
+      <div className="absolute left-1/2 top-1/2 h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/10 blur-[120px]" />
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-10 xl:px-16">
+        <div className="mb-10 text-center sm:mb-12">
+          <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-secondary backdrop-blur-md">
+            <Rocket size={14} aria-hidden="true" />
+            Start a Project
+          </div>
+          <h2 className="text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl md:text-5xl">
+            Let&apos;s build something creative.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted md:text-base">
+            Tell us what you need and we&apos;ll help you plan the best digital
+            solution for your business, brand, or project.
+          </p>
+        </div>
+        <div className="glass-card mx-auto grid max-w-5xl overflow-hidden rounded-[1.5rem] border-cyan-300/20 shadow-[0_0_70px_rgba(8,189,255,0.12)] lg:grid-cols-[0.9fr_1.1fr] lg:rounded-[2rem]">
+          <ContactDetails settings={settings} />
+          <InquiryForm services={services} />
+        </div>
+      </div>
+    </section>
+  );
+}
 
-function ContactDetails({ settings }: { settings: PublicCompanySettings }) { return <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-[#061a3a] p-6 sm:p-8 lg:p-10"><div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-300/20 blur-[70px]" /><div className="relative flex h-full min-h-[21rem] flex-col justify-between gap-10 lg:min-h-[26rem]"><div><div className="mb-8 flex items-center gap-3"><Image src={settings.favicon_url || brand.icon} alt={`${settings.company_name} icon`} width={48} height={48} className="h-12 w-12 rounded-2xl object-contain shadow-[0_0_30px_rgba(8,189,255,0.25)]" /><div><p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200">{settings.company_name}</p><p className="text-sm font-semibold text-white/80">Digital Solutions</p></div></div><h3 className="max-w-sm text-2xl font-black leading-tight tracking-[-0.04em] text-white sm:text-3xl md:text-4xl">Ready to turn your idea into a real digital product?</h3><p className="mt-5 max-w-sm text-sm leading-7 text-cyan-50/80">From websites and systems to branding and marketing creatives, we&apos;ll help you create something clean, modern, and useful.</p></div><div className="space-y-3 sm:space-y-4"><a href={`mailto:${settings.company_email}`} className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white/90 backdrop-blur-md transition hover:bg-white/15 sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-200"><Mail size={18} /></span><span className="truncate">{settings.company_email}</span></a><div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white/90 backdrop-blur-md sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-200"><MapPin size={18} /></span><span>{settings.location}</span></div></div></div></div>; }
+function ContactDetails({ settings }: { settings: PublicCompanySettings }) {
+  return (
+    <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-800 to-[#061a3a] p-6 sm:p-8 lg:p-10">
+      <div className="absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-300/20 blur-[70px]" />
+      <div className="relative flex h-full min-h-[21rem] flex-col justify-between gap-10 lg:min-h-[26rem]">
+        <div>
+          <div className="mb-8 flex items-center gap-3">
+            <Image
+              src={settings.favicon_url || brand.icon}
+              alt={`${settings.company_name} icon`}
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-2xl object-contain shadow-[0_0_30px_rgba(8,189,255,0.25)]"
+            />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200">
+                {settings.company_name}
+              </p>
+              <p className="text-sm font-semibold text-white/80">
+                Digital Solutions
+              </p>
+            </div>
+          </div>
+          <h3 className="max-w-sm text-2xl font-black leading-tight tracking-[-0.04em] text-white sm:text-3xl md:text-4xl">
+            Ready to turn your idea into a real digital product?
+          </h3>
+          <p className="mt-5 max-w-sm text-sm leading-7 text-cyan-50/80">
+            From websites and systems to branding and marketing creatives,
+            we&apos;ll help you create something clean, modern, and useful.
+          </p>
+        </div>
+        <div className="space-y-3 sm:space-y-4">
+          <a
+            href={`mailto:${settings.company_email}`}
+            className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white/90 backdrop-blur-md transition hover:bg-white/15 sm:p-4"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-200">
+              <Mail size={18} />
+            </span>
+            <span className="truncate">{settings.company_email}</span>
+          </a>
+          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 p-3 text-sm text-white/90 backdrop-blur-md sm:p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-200">
+              <MapPin size={18} />
+            </span>
+            <span>{settings.location}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

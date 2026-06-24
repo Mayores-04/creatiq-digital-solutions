@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/crm/auth";
 import { getAdminWorkspace } from "@/lib/crm/admin-data";
 
 export default async function SettingsPage() {
-  await requireAdmin(["OWNER"]);
+  await requireAdmin(["ADMIN"]);
   const workspace = await getAdminWorkspace();
   return <CompanySettingsForm settings={workspace.settings} />;
 }

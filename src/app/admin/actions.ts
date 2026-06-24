@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/crm/auth";
-import { INQUIRY_STATUSES, PROJECT_STATUSES, TASK_STATUSES } from "@/lib/crm/constants";
+import { INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const resourceSchema = z.enum(["inquiries", "clients", "projects", "tasks", "services", "portfolio", "employees"]);
+const resourceSchema = z.enum(["inquiries", "clients", "projects", "tasks", "services", "employees"]);
 const mutationSchema = z.object({
   resource: resourceSchema,
   id: z.string().uuid().optional(),
@@ -81,7 +81,12 @@ function refreshCrm() {
 }
 
 function ownerOnly(role: string) {
-  if (role !== "OWNER") throw new Error("Only an Owner can make that change.");
+  if (role !== "ADMIN") throw new Error("Only an Admin can make that change.");
+}
+
+function authPasswordSetupUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.FRONTEND_URL;
+  return appUrl ? new URL("/auth/set-password", appUrl).toString() : undefined;
 }
 
 export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
@@ -150,14 +155,32 @@ export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
       }
 
       const payload = {
+        slug: optionalText(values, "slug", 100)?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || null,
         name: requiredText(values, "name", 200),
         description: optionalText(values, "description"),
         client_id: optionalUuid(values, "client_id"),
+        category: optionalText(values, "category", 120),
+        project_type: z.enum(PROJECT_TYPES).parse(values.project_type ?? "CLIENT"),
+        lead_outcome: z.enum(LEAD_OUTCOMES).parse(values.lead_outcome ?? "OPEN"),
+        lost_reason: optionalText(values, "lost_reason", 700),
         status: z.enum(PROJECT_STATUSES).parse(values.status),
         progress: integer(values, "progress", 0, 100),
         start_date: dateOrNull(values, "start_date"),
         due_date: dateOrNull(values, "due_date"),
         completed_at: values.status === "COMPLETED" ? new Date().toISOString() : null,
+        won_at: values.lead_outcome === "WON" ? new Date().toISOString() : null,
+        lost_at: values.lead_outcome === "LOST" ? new Date().toISOString() : null,
+        is_published: flag(values, "is_published"),
+        is_featured: flag(values, "is_featured"),
+        image_url: optionalText(values, "image_url", 2_000),
+        image_public_id: optionalText(values, "image_public_id", 300),
+        project_url: optionalText(values, "project_url", 2_000),
+        technologies: (optionalText(values, "technologies", 1_000) ?? "").split(",").map((item) => item.trim()).filter(Boolean).slice(0, 20),
+        project_date: optionalText(values, "project_date", 80),
+        asset_size: optionalText(values, "asset_size", 40),
+        source_image_path: optionalText(values, "source_image_path", 500),
+        sort_order: integer(values, "sort_order", 0, 1000),
+        published_at: flag(values, "is_published") ? new Date().toISOString() : null,
         ...(id ? {} : { created_by: identity.id }),
       };
       result = id
@@ -167,9 +190,12 @@ export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
       if (!result.error && result.data) {
         const memberIds = Array.isArray(values.member_ids) ? values.member_ids.filter((value): value is string => typeof value === "string" && z.uuid().safeParse(value).success) : [];
         await supabase.from("project_members").delete().eq("project_id", result.data.id);
+        await supabase.from("project_contributors").delete().eq("project_id", result.data.id).not("profile_id", "is", null);
         if (memberIds.length) {
           const { error } = await supabase.from("project_members").insert(memberIds.map((profileId) => ({ project_id: result!.data!.id, profile_id: profileId })));
           if (error) throw new Error(error.message);
+          const { error: contributorError } = await supabase.from("project_contributors").insert(memberIds.map((profileId) => ({ project_id: result!.data!.id, profile_id: profileId, contribution_role: "Employee" })));
+          if (contributorError) throw new Error(contributorError.message);
         }
       }
     }
@@ -215,41 +241,27 @@ export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
         : await supabase.from("services").insert(payload).select("id").single();
     }
 
-    if (resource === "portfolio") {
-      ownerOnly(identity.role);
-      const technologies = (optionalText(values, "technologies", 1_000) ?? "").split(",").map((item) => item.trim()).filter(Boolean).slice(0, 20);
-      const payload = {
-        slug: slug(values, "slug"),
-        title: requiredText(values, "title", 180),
-        category: requiredText(values, "category", 120),
-        summary: requiredText(values, "summary", 700),
-        image_url: optionalText(values, "image_url", 2_000),
-        image_public_id: optionalText(values, "image_public_id", 300),
-        project_url: optionalText(values, "project_url", 2_000),
-        technologies,
-        project_date: optionalText(values, "project_date", 80),
-        asset_size: optionalText(values, "asset_size", 40),
-        source_image_path: optionalText(values, "source_image_path", 500),
-        is_published: flag(values, "is_published"),
-        is_featured: flag(values, "is_featured"),
-        sort_order: integer(values, "sort_order", 0, 1000),
-        published_at: flag(values, "is_published") ? new Date().toISOString() : null,
-      };
-      result = id
-        ? await supabase.from("portfolio_projects").update(payload).eq("id", id).select("id").single()
-        : await supabase.from("portfolio_projects").insert(payload).select("id").single();
-    }
-
     if (resource === "employees") {
       ownerOnly(identity.role);
       if (!id) throw new Error("An employee must be selected.");
+      const nextActive = flag(values, "is_active");
+      if (id === identity.id && !nextActive) throw new Error("You cannot deactivate your own account.");
+      const { data: targetProfile, error: targetProfileError } = await supabase
+        .from("profiles")
+        .select("role, full_name, email")
+        .eq("id", id)
+        .single();
+      if (targetProfileError || !targetProfile) throw new Error(targetProfileError?.message ?? "Employee profile not found.");
+      if (targetProfile.role === "ADMIN" && !nextActive && !flag(values, "confirm_co_admin_inactivation")) {
+        throw new Error("Confirm that you want to deactivate this co-admin account first.");
+      }
       const { error } = await supabase.from("profiles").update({
         full_name: requiredText(values, "full_name", 160),
         job_title: optionalText(values, "job_title", 160),
-        is_active: flag(values, "is_active"),
+        is_active: nextActive,
       }).eq("id", id);
       if (error) throw new Error(error.message);
-      await logActivity("profile", id, "updated");
+      await logActivity("profile", id, nextActive ? "updated" : "deactivated", { email: targetProfile.email, role: targetProfile.role });
       refreshCrm();
       return { ok: true, message: "Employee updated." };
     }
@@ -270,7 +282,7 @@ export async function deleteCrmRecord(resource: Exclude<CrmResource, "inquiries"
     z.uuid().parse(id);
     const identity = await requireAdmin();
     ownerOnly(identity.role);
-    const table = ({ clients: "clients", projects: "projects", tasks: "tasks", services: "services", portfolio: "portfolio_projects" } as const)[resource];
+    const table = ({ clients: "clients", projects: "projects", tasks: "tasks", services: "services" } as const)[resource];
     if (!table) throw new Error("This record cannot be deleted here.");
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from(table).delete().eq("id", id);
@@ -359,29 +371,45 @@ export async function updateCompanySettings(values: Record<string, unknown>): Pr
   }
 }
 
-export async function inviteStaff(values: { email: string; fullName: string; jobTitle?: string }): Promise<ActionResult> {
+export async function inviteStaff(values: { email: string; fullName: string; jobTitle?: string; role?: "ADMIN" | "STAFF" }): Promise<ActionResult> {
   try {
     const identity = await requireAdmin();
     ownerOnly(identity.role);
     const email = z.email().parse(values.email.trim());
     const fullName = z.string().trim().min(2).max(160).parse(values.fullName);
     const jobTitle = z.string().trim().max(160).optional().parse(values.jobTitle)?.trim() || null;
+    const role = values.role === "ADMIN" ? "ADMIN" : "STAFF";
     const admin = createSupabaseAdminClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.FRONTEND_URL;
+    const redirectTo = authPasswordSetupUrl();
+
+    const { data: existingProfile, error: existingProfileError } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+    if (existingProfileError) throw new Error(existingProfileError.message);
+
+    if (existingProfile) {
+      const { error: resetError } = await admin.auth.resetPasswordForEmail(email, { redirectTo });
+      if (resetError) throw new Error(resetError.message);
+      await logActivity("profile", existingProfile.id, "password_setup_resent", { email });
+      return { ok: true, message: `A fresh password setup link was sent to ${email}.` };
+    }
+
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName },
-      redirectTo: appUrl ? `${appUrl.replace(/\/$/, "")}/auth/callback` : undefined,
+      redirectTo,
     });
     if (error || !data.user) throw new Error(error?.message ?? "Unable to invite this user.");
 
     const { error: profileError } = await admin.from("profiles").update({
       full_name: fullName,
       job_title: jobTitle,
-      role: "STAFF",
+      role,
       is_active: true,
     }).eq("id", data.user.id);
     if (profileError) throw new Error(profileError.message);
-    await logActivity("profile", data.user.id, "staff_invited", { email });
+    await logActivity("profile", data.user.id, "user_invited", { email, role });
     refreshCrm();
     return { ok: true, message: `Invitation sent to ${email}.` };
   } catch (error) {
@@ -389,11 +417,12 @@ export async function inviteStaff(values: { email: string; fullName: string; job
   }
 }
 
-export async function setUserRole(profileId: string, role: "OWNER" | "STAFF"): Promise<ActionResult> {
+export async function setUserRole(profileId: string, role: "ADMIN" | "STAFF"): Promise<ActionResult> {
   try {
     z.uuid().parse(profileId);
     const identity = await requireAdmin();
     ownerOnly(identity.role);
+    if (profileId === identity.id) throw new Error("You cannot change your own Admin role. Another Admin can do that.");
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("profiles").update({ role }).eq("id", profileId);
     if (error) throw new Error(error.message);
@@ -403,4 +432,122 @@ export async function setUserRole(profileId: string, role: "OWNER" | "STAFF"): P
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to update the role." };
   }
+}
+
+export async function setUserActive(profileId: string, isActive: boolean, confirmedCoAdmin = false): Promise<ActionResult> {
+  try {
+    z.uuid().parse(profileId);
+    const identity = await requireAdmin();
+    ownerOnly(identity.role);
+    if (profileId === identity.id && !isActive) throw new Error("You cannot deactivate your own account.");
+
+    const supabase = await createSupabaseServerClient();
+    const { data: targetProfile, error: targetProfileError } = await supabase
+      .from("profiles")
+      .select("role, full_name, email, is_active")
+      .eq("id", profileId)
+      .single();
+    if (targetProfileError || !targetProfile) throw new Error(targetProfileError?.message ?? "User profile not found.");
+    if (targetProfile.role === "ADMIN" && !isActive && !confirmedCoAdmin) {
+      throw new Error("Confirm that you want to deactivate this co-admin account first.");
+    }
+
+    const { error } = await supabase.from("profiles").update({ is_active: isActive }).eq("id", profileId);
+    if (error) throw new Error(error.message);
+    await logActivity("profile", profileId, isActive ? "activated" : "deactivated", {
+      email: targetProfile.email,
+      role: targetProfile.role,
+    });
+    refreshCrm();
+    return { ok: true, message: `${targetProfile.full_name} is now ${isActive ? "active" : "inactive"}.` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update account access." };
+  }
+}
+
+export async function updateMyProfile(values: { fullName: string; jobTitle?: string }): Promise<ActionResult> {
+  try {
+    const identity = await requireAdmin();
+    const fullName = z.string().trim().min(2).max(160).parse(values.fullName);
+    const jobTitle = z.string().trim().max(160).optional().parse(values.jobTitle)?.trim() || null;
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("profiles").update({
+      full_name: fullName,
+      job_title: jobTitle,
+    }).eq("id", identity.id);
+    if (error) throw new Error(error.message);
+    await logActivity("profile", identity.id, "profile_updated");
+    refreshCrm();
+    return { ok: true, message: "Profile updated." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update your profile." };
+  }
+}
+
+export async function saveExternalContributor(values: { projectId: string; name: string; email?: string; role?: string }): Promise<ActionResult> {
+  try {
+    const identity = await requireAdmin(["ADMIN"]);
+    const projectId = z.uuid().parse(values.projectId);
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("project_contributors").insert({
+      project_id: projectId,
+      external_name: z.string().trim().min(2).max(160).parse(values.name),
+      external_email: values.email ? z.email().parse(values.email.trim()) : null,
+      contribution_role: values.role?.trim().slice(0, 120) || "External contributor",
+    }).select("id").single();
+    if (error || !data) throw new Error(error?.message ?? "Unable to add contributor.");
+    await logActivity("project_contributor", data.id, "external_contributor_added", { projectId, actor: identity.id });
+    refreshCrm();
+    return { ok: true, message: "External contributor added." };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to add contributor." }; }
+}
+
+export async function removeProjectContributor(id: string): Promise<ActionResult> {
+  try {
+    z.uuid().parse(id);
+    await requireAdmin(["ADMIN"]);
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("project_contributors").delete().eq("id", id).is("profile_id", null);
+    if (error) throw new Error(error.message);
+    await logActivity("project_contributor", id, "external_contributor_removed");
+    refreshCrm();
+    return { ok: true, message: "External contributor removed." };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to remove contributor." }; }
+}
+
+export async function createReviewRequest(values: { projectId?: string; clientId?: string; recipientName?: string; recipientEmail: string }): Promise<ActionResult & { token?: string }> {
+  try {
+    const identity = await requireAdmin(["ADMIN"]);
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("customer_reviews").insert({
+      project_id: values.projectId ? z.uuid().parse(values.projectId) : null,
+      client_id: values.clientId ? z.uuid().parse(values.clientId) : null,
+      recipient_name: values.recipientName?.trim().slice(0, 120) || null,
+      recipient_email: z.email().parse(values.recipientEmail.trim()),
+      requested_by: identity.id,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+    }).select("request_token, id").single();
+    if (error || !data) throw new Error(error?.message ?? "Unable to create review request.");
+    await logActivity("customer_review", data.id, "review_requested");
+    refreshCrm();
+    return { ok: true, message: "Review link created.", token: data.request_token };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to create review request." }; }
+}
+
+export async function reviewCustomerReview(id: string, status: "APPROVED" | "REJECTED"): Promise<ActionResult> {
+  try {
+    z.uuid().parse(id);
+    const identity = await requireAdmin(["ADMIN"]);
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("customer_reviews").update({
+      status,
+      reviewed_by: identity.id,
+      reviewed_at: new Date().toISOString(),
+      published_at: status === "APPROVED" ? new Date().toISOString() : null,
+    }).eq("id", id).eq("status", "PENDING");
+    if (error) throw new Error(error.message);
+    await logActivity("customer_review", id, status.toLowerCase());
+    refreshCrm();
+    return { ok: true, message: `Review ${status.toLowerCase()}.` };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to review this feedback." }; }
 }

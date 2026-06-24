@@ -1,8 +1,0 @@
-import { Activity } from "lucide-react";
-import { getAdminWorkspace } from "@/lib/crm/admin-data";
-
-export default async function ActivityPage() {
-  const workspace = await getAdminWorkspace();
-  const names = new Map(workspace.profiles.map((profile) => [profile.id, profile.full_name]));
-  return <section><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">Audit trail</p><h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">Activity</h1><p className="mt-2 text-sm text-muted">A chronological record of CRM changes made by your team.</p><div className="mt-6 overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60">{workspace.activity.length ? workspace.activity.map((item) => <article key={item.id} className="flex gap-4 border-b border-cyan-300/10 p-4 last:border-0 sm:p-5"><span className="mt-0.5 rounded-xl bg-cyan-300/10 p-2 text-secondary"><Activity size={16} /></span><div className="min-w-0"><p className="font-semibold text-primary">{item.action.replaceAll("_", " ")} <span className="font-normal text-muted">{item.entity_type.replaceAll("_", " ")}</span></p><p className="mt-1 text-xs text-muted">{item.actor_id ? names.get(item.actor_id) ?? "Team member" : "System"} · {new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.created_at))}</p>{Object.keys(item.details).length > 0 && <p className="mt-2 text-xs text-muted">{Object.entries(item.details).map(([key, value]) => `${key}: ${String(value)}`).join(" · ")}</p>}</div></article>) : <p className="p-10 text-center text-sm text-muted">No activity has been recorded yet.</p>}</div></section>;
-}

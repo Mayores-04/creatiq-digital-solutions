@@ -8,7 +8,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const identity = await getAdminIdentity();
-  if (!identity || identity.role !== "OWNER") return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  if (!identity || identity.role !== "ADMIN") return NextResponse.json({ error: "Not authorized." }, { status: 403 });
 
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get("file");
-  const purpose = formData.get("purpose") === "logo" ? "logo" : "portfolio";
+  const purpose = formData.get("purpose") === "logo" ? "logo" : "projects";
   if (!(file instanceof File) || !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Upload an image smaller than 8 MB." }, { status: 400 });
   }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const bytes = Buffer.from(await file.arrayBuffer());
     const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
       cloudinary.uploader.upload_stream(
-        { folder: `creatiq/${purpose === "logo" ? "brand" : "portfolio"}`, resource_type: "image" },
+        { folder: `creatiq/${purpose === "logo" ? "brand" : "projects"}`, resource_type: "image" },
         (error, upload) => error || !upload ? reject(error ?? new Error("Image upload failed.")) : resolve(upload),
       ).end(bytes);
     });

@@ -9,17 +9,25 @@ import { ServicesSection } from "@/components/site/services-section";
 import { SolutionsSection } from "@/components/site/solutions-section";
 import { WhyChooseUsSection } from "@/components/site/why-choose-us-section";
 import { getPublicSiteData } from "@/lib/crm/public-data";
+import { ReviewsSection } from "@/components/site/reviews-section";
+
+// Projects, reviews, settings, and public counters are maintained in the CRM.
+// Render per request so a publish/edit is visible on the marketing site without
+// needing another deployment.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { settings, services, portfolio } = await getPublicSiteData();
+  const { settings, services, projects, reviews, stats } =
+    await getPublicSiteData();
   return (
     <main className="relative min-h-screen overflow-x-clip">
       <Header settings={settings} />
-      <HeroSection />
+      <HeroSection stats={stats} />
       <AboutSection />
       <ServicesSection services={services} />
-      <SolutionsSection />
-      <PortfolioSection projects={portfolio} />
+      <SolutionsSection stats={stats} />
+      <PortfolioSection projects={projects} />
+      <ReviewsSection reviews={reviews} />
       <WhyChooseUsSection />
       <ProcessSection />
       <ContactSection settings={settings} services={services} />

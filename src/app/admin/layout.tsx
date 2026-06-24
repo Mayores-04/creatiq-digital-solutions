@@ -1,12 +1,21 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { LogOut } from "lucide-react";
+
+import {
+  AdminHeader,
+  type AdminNotification,
+} from "@/components/admin/admin-header";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { getAdminIdentity } from "@/lib/crm/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export default async function AdminLayout({ children }: { children: ReactNode }) {
+export default async function AdminLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const identity = await getAdminIdentity();
+
   // The login route lives beneath /admin, so it also receives this layout.
   // Let unauthenticated children render; each protected CRM page calls
   // requireAdmin/getAdminWorkspace and redirects independently.
@@ -14,21 +23,72 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   async function signOut() {
     "use server";
+
     const supabase = await createSupabaseServerClient();
+
     await supabase.auth.signOut();
+
     redirect("/admin/login");
   }
 
+  const supabase = await createSupabaseServerClient();
+
+  const [activityResult, profilesResult] = await Promise.all([
+    supabase
+      .from("activity_logs")
+      .select("id, actor_id, entity_type, action, details, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase.from("profiles").select("id, full_name"),
+  ]);
+
+  const names = new Map(
+    (profilesResult.data ?? []).map((profile) => [
+      profile.id,
+      profile.full_name,
+    ]),
+  );
+
+  const notifications: AdminNotification[] = (activityResult.data ?? []).map(
+    (item) => ({
+      id: item.id,
+      title: `${item.action.replaceAll("_", " ")} ${item.entity_type.replaceAll("_", " ")}`,
+      detail: `${item.actor_id ? (names.get(item.actor_id) ?? "Team member") : "System"}${formatDetails(item.details)}`,
+      createdAt: item.created_at,
+    }),
+  );
+
   return (
-    <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <AdminSidebar role={identity.role} />
-      <div className="min-w-0">
-        <header className="flex min-h-16 items-center justify-between border-b border-cyan-300/15 bg-surface/70 px-4 py-3 sm:px-6 lg:px-8">
-          <div><p className="text-sm font-bold text-primary">{identity.fullName}</p><p className="text-[10px] font-bold uppercase tracking-widest text-secondary">{identity.role}</p></div>
-          <form action={signOut}><button className="inline-flex h-10 items-center gap-2 rounded-lg border border-cyan-300/20 px-3 text-xs font-bold uppercase tracking-widest text-muted transition hover:border-secondary hover:text-secondary"><LogOut size={15} />Sign out</button></form>
-        </header>
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:pl-72">
+        <AdminHeader
+          identity={identity}
+          notifications={notifications}
+          signOutAction={signOut}
+        />
+
+        <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+          <div className="min-h-full p-4 sm:p-6 lg:p-8">{children}</div>
+        </main>
       </div>
     </div>
   );
+}
+
+function formatDetails(details: unknown) {
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return "";
+  }
+
+  const entries = Object.entries(details);
+
+  if (!entries.length) {
+    return "";
+  }
+
+  return ` - ${entries
+    .map(([key, value]) => `${key}: ${String(value)}`)
+    .join(", ")}`;
 }

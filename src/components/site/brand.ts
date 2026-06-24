@@ -5,7 +5,7 @@ export const brand = {
 
 export const navigationLinks = [
   { href: "#services", label: "Services" },
-  { href: "#portfolio", label: "Portfolio" },
+  { href: "#projects", label: "Projects" },
   { href: "#process", label: "Process" },
   { href: "#about", label: "About" },
 ];
