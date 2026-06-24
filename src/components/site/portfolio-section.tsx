@@ -265,15 +265,15 @@ export function PortfolioSection({ projects }: { projects: PublicProject[] }) {
   return (
     <section
       id="projects"
-      className="relative overflow-x-clip bg-background py-16 sm:py-24 lg:py-32"
+      className="relative overflow-x-clip bg-background py-14 sm:py-24 lg:py-32"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-[7rem] h-[34rem] sm:top-[8rem] sm:h-[46rem]">
-        <div className="absolute left-1/2 top-1/2 h-[28rem] w-[70rem] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(8,189,255,0.16)_0%,rgba(8,189,255,0.09)_36%,rgba(8,189,255,0.035)_60%,transparent_80%)] blur-3xl sm:h-[38rem] sm:w-[150rem]" />
-        <div className="absolute left-1/2 top-1/2 h-[20rem] w-[55rem] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.13)_0%,rgba(37,99,235,0.065)_46%,transparent_78%)] blur-2xl sm:h-[28rem] sm:w-[115rem]" />
+      <div className="pointer-events-none absolute inset-x-0 top-[6rem] h-[32rem] sm:top-[8rem] sm:h-[46rem]">
+        <div className="absolute left-1/2 top-1/2 h-[26rem] w-[64rem] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(8,189,255,0.16)_0%,rgba(8,189,255,0.09)_36%,rgba(8,189,255,0.035)_60%,transparent_80%)] blur-3xl sm:h-[38rem] sm:w-[150rem]" />
+        <div className="absolute left-1/2 top-1/2 h-[18rem] w-[52rem] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.13)_0%,rgba(37,99,235,0.065)_46%,transparent_78%)] blur-2xl sm:h-[28rem] sm:w-[115rem]" />
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-10 xl:px-16">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:mb-14 lg:flex-row lg:items-end">
+        <div className="mb-7 flex flex-col justify-between gap-4 sm:mb-14 lg:flex-row lg:items-end">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">
               Projects
@@ -322,7 +322,7 @@ export function PortfolioSection({ projects }: { projects: PublicProject[] }) {
           ref={emblaRef}
           className="overflow-hidden px-0 sm:px-10 lg:px-16 xl:px-24 sm:[mask-image:linear-gradient(90deg,transparent_0%,black_5%,black_95%,transparent_100%)]"
         >
-          <div className="flex touch-pan-y select-none py-6 sm:py-8">
+          <div className="flex touch-pan-y select-none py-4 sm:py-8">
             {virtualProjects.map((item) => {
               const isActive = item.virtualIndex === selectedVirtualIndex;
 
@@ -347,7 +347,7 @@ export function PortfolioSection({ projects }: { projects: PublicProject[] }) {
             onPointerUp={handleDotsPointerEnd}
             onPointerCancel={handleDotsPointerEnd}
             onDragStart={(event) => event.preventDefault()}
-            className="no-scrollbar flex max-w-full touch-none select-none items-center gap-2 overflow-x-auto rounded-full border border-cyan-300/15 bg-background/75 px-3 py-2 backdrop-blur-md"
+            className="no-scrollbar flex max-w-full  touch-none select-none items-center gap-2 overflow-x-auto rounded-full border border-cyan-300/15 bg-background/75 px-3 py-2 backdrop-blur-md"
             aria-label="Project carousel navigation"
           >
             {projects.map((project, index) => (
@@ -387,7 +387,7 @@ function ProjectSlide({
       className={`group min-w-0 shrink-0 grow-0 basis-[88%] px-2 transition-[opacity,transform,filter] duration-500 sm:basis-[74%] sm:px-4 lg:basis-[60rem] xl:basis-[64rem] ${
         isActive
           ? "scale-100 opacity-100 blur-0"
-          : "scale-[0.86] opacity-35 blur-[1px] sm:scale-[0.82]"
+          : "scale-[0.9] opacity-35 blur-[1px] sm:scale-[0.82]"
       }`}
     >
       <div
@@ -402,7 +402,7 @@ function ProjectSlide({
             onSelect();
           }
         }}
-        className={`relative h-[31rem] cursor-grab overflow-hidden rounded-[1.5rem] border bg-background/35 shadow-[0_0_70px_rgba(0,0,0,0.25)] backdrop-blur-md active:cursor-grabbing sm:h-[32rem] sm:rounded-[2rem] lg:h-[34rem] xl:h-[36rem] ${
+        className={`relative h-[27rem] cursor-grab overflow-hidden rounded-[1.5rem] border bg-background/35 shadow-[0_0_70px_rgba(0,0,0,0.25)] backdrop-blur-md active:cursor-grabbing sm:h-[32rem] sm:rounded-[2rem] lg:h-[34rem] xl:h-[36rem] ${
           isActive
             ? "border-secondary/60 shadow-[0_0_100px_rgba(8,189,255,0.18)]"
             : "border-cyan-300/15"
@@ -419,8 +419,8 @@ function ProjectSlide({
         ) : null}
 
         {isActive ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-end bg-black/0 p-4 opacity-0 backdrop-blur-0 transition duration-500 group-hover:pointer-events-auto group-hover:bg-black/80 group-hover:opacity-100 group-hover:backdrop-blur-[3px] sm:p-6 lg:p-8">
-            <div className="w-full max-w-3xl translate-y-5 transition duration-500 group-hover:translate-y-0">
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex items-end bg-gradient-to-t from-black/95 via-black/65 to-transparent p-4 opacity-100 backdrop-blur-[2px] sm:pointer-events-none sm:inset-0 sm:bg-black/0 sm:p-6 sm:opacity-0 sm:backdrop-blur-0 sm:transition sm:duration-500 sm:group-hover:pointer-events-auto sm:group-hover:bg-black/80 sm:group-hover:opacity-100 sm:group-hover:backdrop-blur-[3px] lg:p-8">
+            <div className="w-full max-w-3xl translate-y-0 sm:translate-y-5 sm:transition sm:duration-500 sm:group-hover:translate-y-0">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-cyan-300/25 bg-cyan-300/15 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-secondary backdrop-blur-md sm:text-[10px]">
                   {project.category}
@@ -441,7 +441,7 @@ function ProjectSlide({
                 {project.title}
               </h3>
 
-              <p className="mt-3 line-clamp-3 max-w-2xl text-xs leading-6 text-white/75 sm:mt-4 sm:text-sm sm:leading-7">
+              <p className="mt-3 line-clamp-2 max-w-2xl text-xs leading-6 text-white/75 sm:line-clamp-3 sm:mt-4 sm:text-sm sm:leading-7">
                 {project.summary}
               </p>
 
@@ -492,7 +492,7 @@ function ProjectPreviewImage({
       priority={priority}
       draggable={false}
       sizes="(min-width: 1536px) 64rem, (min-width: 1280px) 60rem, (min-width: 640px) 74vw, 88vw"
-      className="pointer-events-none object-contain p-3 sm:p-8"
+      className="pointer-events-none object-contain p-2 sm:p-8"
     />
   );
 }
