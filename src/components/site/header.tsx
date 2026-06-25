@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { brand, navigationLinks } from "./brand";
 import type { PublicCompanySettings } from "@/lib/crm/public-data";
+
+const LAST_SECTION_KEY = "creatiq-last-section";
 
 export function Header({ settings }: { settings: PublicCompanySettings }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,26 +24,6 @@ export function Header({ settings }: { settings: PublicCompanySettings }) {
       { href: "#contact", label: "Contact" },
     ];
   }, [visibleLinks]);
-
-  useLayoutEffect(() => {
-    if ("scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
-    }
-
-    const html = document.documentElement;
-    const previousScrollBehavior = html.style.scrollBehavior;
-
-    html.style.scrollBehavior = "auto";
-
-    window.history.replaceState(null, "", window.location.pathname);
-    window.scrollTo(0, 0);
-    setActiveHref("#home");
-
-    requestAnimationFrame(() => {
-      window.scrollTo(0, 0);
-      html.style.scrollBehavior = previousScrollBehavior;
-    });
-  }, []);
 
   useEffect(() => {
     function getSectionElements() {
@@ -78,14 +60,23 @@ export function Header({ settings }: { settings: PublicCompanySettings }) {
       let currentHref = "#home";
 
       for (const section of sections) {
-        const sectionTop = section.element.offsetTop;
-
-        if (readingLine >= sectionTop) {
+        if (readingLine >= section.element.offsetTop) {
           currentHref = section.href;
         }
       }
 
       setActiveHref(currentHref);
+
+      window.sessionStorage.setItem(LAST_SECTION_KEY, currentHref);
+
+      const nextUrl =
+        currentHref === "#home"
+          ? window.location.pathname
+          : `${window.location.pathname}${currentHref}`;
+
+      if (`${window.location.pathname}${window.location.hash}` !== nextUrl) {
+        window.history.replaceState(null, "", nextUrl);
+      }
     }
 
     function handleScroll() {
@@ -130,11 +121,13 @@ export function Header({ settings }: { settings: PublicCompanySettings }) {
 
   function handleLogoClick() {
     setActiveHref("#home");
+    window.sessionStorage.setItem(LAST_SECTION_KEY, "#home");
     closeMenu();
   }
 
   function handleNavClick(href: string) {
     setActiveHref(href);
+    window.sessionStorage.setItem(LAST_SECTION_KEY, href);
     closeMenu();
   }
 
@@ -153,7 +146,7 @@ export function Header({ settings }: { settings: PublicCompanySettings }) {
             width={260}
             height={90}
             priority
-            className="h-10 w-auto object-contain "
+            className="h-11 w-auto object-contain sm:h-12 lg:h-12"
           />
         </a>
 
