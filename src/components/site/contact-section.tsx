@@ -62,7 +62,7 @@ function ContactDetails({ settings }: { settings: PublicCompanySettings }) {
                 {settings.company_name}
               </p>
               <p className="text-sm font-semibold text-white/80">
-                Digital Solutions
+                Create. Innovate. Elevate.
               </p>
             </div>
           </div>
