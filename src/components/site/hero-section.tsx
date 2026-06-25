@@ -10,7 +10,11 @@ const highlights = [
   ["Brand", "Digital identity"],
 ];
 
-export function HeroSection({ stats }: { stats: { projects: number; active: number; won: number; inquiries: number } }) {
+export function HeroSection({
+  stats,
+}: {
+  stats: { projects: number; active: number; won: number; inquiries: number };
+}) {
   return (
     <section
       id="home"
@@ -80,7 +84,11 @@ export function HeroSection({ stats }: { stats: { projects: number; active: numb
   );
 }
 
-function HeroShowcase({ stats }: { stats: { projects: number; active: number; won: number; inquiries: number } }) {
+function HeroShowcase({
+  stats,
+}: {
+  stats: { projects: number; active: number; won: number; inquiries: number };
+}) {
   return (
     <div className="relative mx-auto hidden min-h-[480px] w-full max-w-xl items-center justify-center lg:flex">
       <div className="absolute h-[min(34rem,90vw)] w-[min(34rem,90vw)] rounded-full bg-cyan-400/10 blur-[80px]" />

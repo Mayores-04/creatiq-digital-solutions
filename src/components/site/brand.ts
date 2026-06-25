@@ -4,8 +4,8 @@ export const brand = {
 };
 
 export const navigationLinks = [
+  { href: "#about", label: "About" },
   { href: "#services", label: "Services" },
   { href: "#projects", label: "Projects" },
   { href: "#process", label: "Process" },
-  { href: "#about", label: "About" },
 ];
