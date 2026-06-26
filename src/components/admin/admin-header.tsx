@@ -8,6 +8,7 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  Menu,
   Settings,
   Shield,
   UserRound,
@@ -75,19 +76,35 @@ export function AdminHeader({
     };
   }, []);
 
-  return (
-    <header className="z-20 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-cyan-300/15 bg-surface/90 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-primary">
-          {identity.fullName}
-        </p>
+  function openMobileSidebar() {
+    window.dispatchEvent(new Event("creatiq-admin-sidebar-open"));
+  }
 
-        <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">
-          {identity.role}
-        </p>
+  return (
+    <header className="relative z-20 flex h-16 shrink-0 items-center justify-between gap-2 overflow-visible border-b border-cyan-300/15 bg-surface/90 px-3 backdrop-blur-xl sm:px-5 lg:h-[4.5rem] lg:px-8">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <button
+          type="button"
+          onClick={openMobileSidebar}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/[0.04] text-secondary transition hover:border-cyan-300/40 hover:bg-cyan-300/10 lg:hidden"
+          aria-label="Open admin sidebar"
+          aria-controls="admin-mobile-sidebar"
+        >
+          <Menu size={21} />
+        </button>
+
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="truncate text-sm font-black text-primary sm:text-base">
+            {identity.fullName}
+          </p>
+
+          <p className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-secondary sm:text-[10px]">
+            {identity.role}
+          </p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <div ref={notificationsRef} className="relative">
           <button
             type="button"
@@ -95,7 +112,7 @@ export function AdminHeader({
               setNotificationsOpen((open) => !open);
               setMenuOpen(false);
             }}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 text-muted transition hover:border-secondary hover:bg-cyan-300/10 hover:text-secondary"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/[0.03] text-muted transition hover:border-secondary hover:bg-cyan-300/10 hover:text-secondary"
             aria-label="Open notifications"
             aria-expanded={notificationsOpen}
           >
@@ -107,19 +124,19 @@ export function AdminHeader({
           </button>
 
           {notificationsOpen ? (
-            <div className="absolute right-0 z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-cyan-300/15 bg-[#061329] shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
+            <div className="fixed inset-x-3 top-[4.75rem] z-50 overflow-hidden rounded-2xl border border-cyan-300/15 bg-[#061329] shadow-[0_24px_80px_rgba(0,0,0,0.38)] sm:absolute sm:inset-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[24rem]">
               <div className="flex items-center justify-between gap-4 border-b border-cyan-300/10 px-4 py-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">
                     Activity Center
                   </p>
 
-                  <p className="mt-0.5 text-xs text-muted">
+                  <p className="mt-0.5 truncate text-xs text-muted">
                     Latest CRM movement
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-3">
                   <Link
                     href="/admin/notifications#notification-settings"
                     onClick={() => setNotificationsOpen(false)}
@@ -138,21 +155,21 @@ export function AdminHeader({
                 </div>
               </div>
 
-              <div className="custom-scrollbar max-h-80 overflow-y-auto">
+              <div className="custom-scrollbar max-h-[22rem] overflow-y-auto">
                 {notifications.length ? (
                   notifications.slice(0, 8).map((item) => (
                     <Link
                       key={item.id}
                       href="/admin/notifications"
                       onClick={() => setNotificationsOpen(false)}
-                      className="flex gap-3 border-b border-cyan-300/10 p-4 text-left transition last:border-0 hover:bg-cyan-300/5"
+                      className="flex gap-3 border-b border-cyan-300/10 p-4 text-left transition last:border-0 hover:bg-cyan-300/[0.05]"
                     >
                       <span className="mt-0.5 shrink-0 rounded-xl bg-cyan-300/10 p-2 text-secondary">
                         <Activity size={15} />
                       </span>
 
                       <span className="min-w-0">
-                        <span className="block text-sm font-bold text-primary">
+                        <span className="block truncate text-sm font-bold text-primary">
                           {item.title}
                         </span>
 
@@ -193,11 +210,11 @@ export function AdminHeader({
               setMenuOpen((open) => !open);
               setNotificationsOpen(false);
             }}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-cyan-300/20 px-2.5 text-left transition hover:border-secondary hover:bg-cyan-300/10 sm:px-3"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.03] px-2.5 text-left transition hover:border-secondary hover:bg-cyan-300/10 sm:px-3"
             aria-label="Open user menu"
             aria-expanded={menuOpen}
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-300/10 text-secondary">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-cyan-300/10 text-secondary">
               <UserRound size={15} />
             </span>
 
@@ -213,12 +230,14 @@ export function AdminHeader({
 
             <ChevronDown
               size={14}
-              className={`text-muted transition ${menuOpen ? "rotate-180" : ""}`}
+              className={`shrink-0 text-muted transition ${
+                menuOpen ? "rotate-180" : ""
+              }`}
             />
           </button>
 
           {menuOpen ? (
-            <div className="custom-scrollbar absolute right-0 z-50 mt-2 max-h-[calc(100dvh-6rem)] w-64 overflow-y-auto rounded-2xl border border-cyan-300/15 bg-[#061329] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
+            <div className="custom-scrollbar fixed inset-x-3 top-[4.75rem] z-50 max-h-[calc(100dvh-5.5rem)] overflow-y-auto rounded-2xl border border-cyan-300/15 bg-[#061329] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.38)] sm:absolute sm:inset-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-64">
               <div className="rounded-xl bg-cyan-300/[0.04] px-3 py-3">
                 <p className="truncate text-sm font-bold text-primary">
                   {identity.fullName}
@@ -293,10 +312,10 @@ function MenuLink({
     <Link
       href={href}
       onClick={onClick}
-      className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted transition hover:bg-cyan-300/10 hover:text-primary"
+      className="mt-1 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted transition hover:bg-cyan-300/10 hover:text-primary"
     >
-      <Icon size={16} />
-      {label}
+      <Icon size={16} className="shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
 }

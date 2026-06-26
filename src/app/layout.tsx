@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" className="dark scroll-smooth no-scrollbar">
       <body className="bg-background text-foreground antialiased">
         <PwaRegister />
-        <SplashScreen />;
+        <SplashScreen />
         <AuthInviteBridge />
         {children}
         <Toaster

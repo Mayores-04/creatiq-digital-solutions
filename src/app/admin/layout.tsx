@@ -53,7 +53,9 @@ export default async function AdminLayout({
     (item) => ({
       id: item.id,
       title: `${item.action.replaceAll("_", " ")} ${item.entity_type.replaceAll("_", " ")}`,
-      detail: `${item.actor_id ? (names.get(item.actor_id) ?? "Team member") : "System"}${formatDetails(item.details)}`,
+      detail: `${
+        item.actor_id ? (names.get(item.actor_id) ?? "Team member") : "System"
+      }${formatDetails(item.details)}`,
       createdAt: item.created_at,
     }),
   );
@@ -70,7 +72,9 @@ export default async function AdminLayout({
         />
 
         <main className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-          <div className="min-h-full p-4 sm:p-6 lg:p-8">{children}</div>
+          <div className="min-h-full w-full max-w-full p-3 sm:p-4 md:p-5 lg:p-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>
