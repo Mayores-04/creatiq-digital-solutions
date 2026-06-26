@@ -13,19 +13,12 @@ export const metadata: Metadata = {
     icon: [
       {
         url: "/icon.png",
-        sizes: "any",
-      },
-      {
-        url: "/icons/icon-512.png",
         type: "image/png",
-        sizes: "512x512",
       },
     ],
-    shortcut: "/icon.png",
     apple: [
       {
-        url: "/icons/apple-touch-icon.png",
-        sizes: "180x180",
+        url: "/apple-icon.png",
         type: "image/png",
       },
     ],
