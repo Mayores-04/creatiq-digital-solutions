@@ -10,8 +10,25 @@ export const metadata: Metadata = {
   description:
     "Creatiq Digital Solutions creates websites, custom systems, mobile apps, branding, graphics design, and digital marketing materials.",
   icons: {
-    icon: "/images/brand/creatiq-icon-dark.png",
-    apple: "/images/brand/creatiq-icon-dark.png",
+    icon: [
+      {
+        url: "/icon.png",
+        sizes: "any",
+      },
+      {
+        url: "/images/brand/creatiq-icon-dark.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    shortcut: "/icon.png",
+    apple: [
+      {
+        url: "/images/brand/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
 };
 
