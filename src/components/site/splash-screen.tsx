@@ -7,10 +7,22 @@ import { useGLTF, useProgress } from "@react-three/drei";
 import type { Group } from "three";
 import { brand } from "./brand";
 
-const MODEL_URL = "/models/creatiq_digital_solutions_logo_colored.glb";
+const MODEL_URL =
+  "/models/creatiq_digital_solutions_logo_bright_blue_match.glb";
 const MIN_SPLASH_DURATION = 2800;
 const LOADING_FAILSAFE_DURATION = 6500;
 const LAST_SECTION_KEY = "creatiq-last-section";
+
+/**
+ * EASY SETTINGS
+ */
+const MODEL_SCALE = 0.62;
+const CAMERA_DISTANCE = 7.5;
+const ROTATION_SPEED = 0.24;
+
+const LIGHT_POWER = 1.25;
+const DESKTOP_EXPOSURE = 1.75;
+const LOW_END_EXPOSURE = 1.25;
 
 type DeviceInfo = {
   isLowEnd: boolean;
@@ -64,23 +76,23 @@ function NexusModel({ reduceMotion }: { reduceMotion: boolean }) {
 
     elapsedRef.current += delta;
 
-    // Full rotating effect retained
-    groupRef.current.rotation.y += delta * 0.24;
+    // Full rotating effect
+    groupRef.current.rotation.y += delta * ROTATION_SPEED;
 
-    // Smooth floating tilt
+    // Floating tilt
     groupRef.current.rotation.x = Math.sin(elapsedRef.current * 0.75) * 0.05;
 
-    // Smooth floating movement
+    // Floating movement
     groupRef.current.position.y =
-      0.13 + Math.sin(elapsedRef.current * 1.05) * 0.04;
+      0.1 + Math.sin(elapsedRef.current * 1.05) * 0.035;
   });
 
   return (
     <group
       ref={groupRef}
-      scale={0.62}
+      scale={MODEL_SCALE}
       rotation={[0, 0, 0]}
-      position={[0, 0.13, 0]}
+      position={[0, 0.08, 0]}
       dispose={null}
     >
       <primitive object={scene} />
@@ -97,7 +109,7 @@ function SplashCanvas({
 }) {
   return (
     <Canvas
-      camera={{ position: [0, 0.15, 8], fov: 35 }}
+      camera={{ position: [0, 0.15, CAMERA_DISTANCE], fov: 35 }}
       dpr={isLowEnd ? 1 : [1, 1.5]}
       frameloop={reduceMotion ? "demand" : "always"}
       performance={{ min: 0.5 }}
@@ -108,29 +120,61 @@ function SplashCanvas({
         stencil: false,
         powerPreference: "high-performance",
       }}
+      onCreated={({ gl }) => {
+        gl.toneMappingExposure = isLowEnd ? LOW_END_EXPOSURE : DESKTOP_EXPOSURE;
+      }}
       className="absolute inset-0"
     >
       <color attach="background" args={["#020b1f"]} />
 
-      <ambientLight intensity={1.15} />
+      {/* Stronger global lighting */}
+      <ambientLight intensity={1.55 * LIGHT_POWER} />
 
-      <directionalLight position={[4, 4, 3]} intensity={2.15} color="#ffffff" />
+      {/* Soft sky/floor light */}
+      <hemisphereLight args={["#dff7ff", "#020b1f", 1.15 * LIGHT_POWER]} />
 
+      {/* Main top/right light */}
       <directionalLight
-        position={[-3, 2, -2]}
-        intensity={0.85}
-        color="#bfdbfe"
+        position={[4, 4, 4]}
+        intensity={3.25 * LIGHT_POWER}
+        color="#e0f7ff"
       />
 
-      <pointLight position={[0, 1.4, 4]} intensity={1.35} color="#7dd3fc" />
+      {/* Side blue highlight */}
+      <directionalLight
+        position={[-4, 3, 2]}
+        intensity={1.85 * LIGHT_POWER}
+        color="#38bdf8"
+      />
+
+      {/* Front glow light */}
+      <pointLight
+        position={[0, 1.6, 4]}
+        intensity={3.1 * LIGHT_POWER}
+        color="#22d3ee"
+      />
+
+      {/* Bottom/right blue fill light */}
+      <pointLight
+        position={[2.5, -1.2, 3]}
+        intensity={1.9 * LIGHT_POWER}
+        color="#0ea5e9"
+      />
+
+      {/* Bottom/left dark blue fill light */}
+      <pointLight
+        position={[-2.5, -1, 3]}
+        intensity={1.35 * LIGHT_POWER}
+        color="#3b82f6"
+      />
 
       {!isLowEnd && (
         <spotLight
-          position={[0, 4.5, 5]}
-          angle={0.45}
+          position={[0, 4.8, 5.5]}
+          angle={0.5}
           penumbra={1}
-          intensity={1.2}
-          color="#dbeafe"
+          intensity={2.45 * LIGHT_POWER}
+          color="#67e8f9"
         />
       )}
 
