@@ -9,7 +9,9 @@ function getJwtRole(token: string) {
   if (!payload) return null;
 
   try {
-    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { role?: unknown };
+    const decoded = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as { role?: unknown };
     return typeof decoded.role === "string" ? decoded.role : null;
   } catch {
     return null;
@@ -25,7 +27,9 @@ export function createSupabaseAdminClient() {
 
   const keyRole = getJwtRole(serviceRoleKey);
   if (keyRole && keyRole !== "service_role") {
-    throw new Error("User invitations require the Supabase service_role secret. Replace SUPABASE_SERVICE_ROLE_KEY with the server-only service_role key from your Supabase dashboard.");
+    throw new Error(
+      "User invitations require the Supabase service_role secret. Replace SUPABASE_SERVICE_ROLE_KEY with the server-only service_role key from your Supabase dashboard.",
+    );
   }
 
   const { url } = getSupabaseConfig();
