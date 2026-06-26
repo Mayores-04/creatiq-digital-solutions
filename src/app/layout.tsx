@@ -12,19 +12,19 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/icon.png",
+        url: "/favicon.ico",
         sizes: "any",
       },
       {
-        url: "/images/brand/creatiq-icon-dark.png",
+        url: "/icons/icon-512.png",
         type: "image/png",
         sizes: "512x512",
       },
     ],
-    shortcut: "/icon.png",
+    shortcut: "/favicon.ico",
     apple: [
       {
-        url: "/images/brand/apple-touch-icon.png",
+        url: "/icons/apple-touch-icon.png",
         sizes: "180x180",
         type: "image/png",
       },
