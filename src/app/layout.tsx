@@ -1,28 +1,65 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+
 import "./globals.css";
+
 import { AuthInviteBridge } from "@/components/auth/auth-invite-bridge";
 import { PwaRegister } from "@/components/pwa-register";
 import { SplashScreen } from "@/components/site/splash-screen";
 
 export const metadata: Metadata = {
-  title: "CREATIQ | Digital Solutions for the Future",
+  metadataBase: new URL("https://creatiqdigital.com"),
+  title: {
+    default: "CREATIQ | Digital Solutions for the Future",
+    template: "%s | CREATIQ",
+  },
   description:
     "Creatiq Digital Solutions creates websites, custom systems, mobile apps, branding, graphics design, and digital marketing materials.",
+  applicationName: "CREATIQ",
+  appleWebApp: {
+    capable: true,
+    title: "CREATIQ",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: [
       {
-        url: "/icon.png",
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+      {
+        url: "/icons/icon-192.png",
         type: "image/png",
+        sizes: "192x192",
+      },
+      {
+        url: "/icons/icon-512.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+    shortcut: [
+      {
+        url: "/favicon.ico",
       },
     ],
     apple: [
       {
-        url: "/apple-icon.png",
+        url: "/icons/apple-touch-icon.png",
         type: "image/png",
+        sizes: "180x180",
       },
     ],
   },
+  manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#020b1f",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -36,7 +73,9 @@ export default function RootLayout({
         <PwaRegister />
         <SplashScreen />
         <AuthInviteBridge />
+
         {children}
+
         <Toaster
           position="top-right"
           theme="dark"
