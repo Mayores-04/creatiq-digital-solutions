@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { DEFAULT_COMPANY_SETTINGS } from "@/lib/crm/constants";
 import { getSupabaseConfig, hasSupabaseConfig } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
@@ -12,6 +13,11 @@ const inquirySchema = z.object({
   description: z.string().trim().min(10).max(5_000),
   website: z.string().max(0).optional(),
 });
+
+type CompanyEmailResult = {
+  data: { company_email: string | null } | null;
+  error: { message: string } | null;
+};
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => {
@@ -141,9 +147,25 @@ export async function POST(request: Request) {
     return Response.json({ error: "Inquiry service is temporarily unavailable." }, { status: 503 });
   }
 
+  const { url, publishableKey } = getSupabaseConfig();
+  const crm = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  let companyEmail = process.env.INQUIRY_TO ?? DEFAULT_COMPANY_SETTINGS.company_email;
+
   try {
-    const { url, publishableKey } = getSupabaseConfig();
-    const crm = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const settings = await crm
+      .from("company_settings")
+      .select("company_email")
+      .eq("id", true)
+      .maybeSingle() as unknown as CompanyEmailResult;
+
+    if (!settings.error && settings.data?.company_email) {
+      companyEmail = settings.data.company_email;
+    }
+  } catch (error) {
+    console.warn("Unable to load company inquiry email; using fallback recipient.", error);
+  }
+
+  try {
     const { error } = await crm.rpc("submit_website_inquiry", {
       inquiry_name: name,
       inquiry_email: email,
@@ -177,9 +199,9 @@ export async function POST(request: Request) {
   const confirmation = createConfirmationEmail({ name, services });
 
   try {
-    await transporter.sendMail({
+    const companyMail = transporter.sendMail({
       from: `Creatiq Website <${smtpUser}>`,
-      to: process.env.INQUIRY_TO ?? "creatiq.digitalsolutions@gmail.com",
+      to: companyEmail,
       replyTo: email,
       subject: `New Creatiq inquiry: ${serviceSummary}`,
       text: [
@@ -195,13 +217,34 @@ export async function POST(request: Request) {
       html: `<h2>New Creatiq website inquiry</h2><p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> ${safeEmail}</p><p><strong>Services:</strong> ${safeServiceSummary}</p><p><strong>Project description:</strong><br />${safeDescription}</p>`,
     });
 
-    await transporter.sendMail({
+    const customerMail = transporter.sendMail({
       from: `Creatiq Digital Solutions <${smtpUser}>`,
       to: email,
+      replyTo: companyEmail,
       subject: "We received your inquiry — Creatiq Digital Solutions",
       text: confirmation.text,
       html: confirmation.html,
     });
+
+    const [companyResult, customerResult] = await Promise.allSettled([
+      companyMail,
+      customerMail,
+    ]);
+
+    if (companyResult.status === "rejected" || customerResult.status === "rejected") {
+      console.error("Inquiry email delivery failed:", {
+        company: companyResult.status === "rejected" ? companyResult.reason : "sent",
+        customer: customerResult.status === "rejected" ? customerResult.reason : "sent",
+      });
+
+      return Response.json(
+        {
+          error:
+            "Your inquiry was saved, but one of the confirmation emails could not be sent. Please contact us directly if you do not receive a confirmation.",
+        },
+        { status: 502 },
+      );
+    }
   } catch (error) {
     console.error("Unable to send inquiry email:", error);
     return Response.json(
