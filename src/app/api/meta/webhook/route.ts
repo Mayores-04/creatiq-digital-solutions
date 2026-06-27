@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 
 function metaVerifyToken() {
   return (
+    process.env.META_VERIFY_TOKEN ??
     process.env.META_WEBHOOK_VERIFY_TOKEN ??
     process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN ??
     process.env.CREATIQ_META_VERIFY_TOKEN_2026 ??
