@@ -155,7 +155,7 @@ export function AdminHeader({
                 </div>
               </div>
 
-              <div className="custom-scrollbar max-h-[22rem] overflow-y-auto">
+              <div className="custom-scrollbar max-h-[24rem] overflow-y-auto">
                 {notifications.length ? (
                   notifications.slice(0, 8).map((item) => (
                     <Link
@@ -190,15 +190,6 @@ export function AdminHeader({
                 )}
               </div>
 
-              <div className="border-t border-cyan-300/10 px-4 py-3">
-                <Link
-                  href="/admin/notifications"
-                  onClick={() => setNotificationsOpen(false)}
-                  className="block rounded-xl bg-cyan-300/10 px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/15"
-                >
-                  Open activity center
-                </Link>
-              </div>
             </div>
           ) : null}
         </div>

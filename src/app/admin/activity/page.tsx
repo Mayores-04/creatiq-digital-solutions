@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import { AutoSubmitFilterForm } from "@/components/admin/auto-submit-filter-form";
 import { getAdminWorkspace } from "@/lib/crm/admin-data";
 import { requireModuleAccess } from "@/lib/crm/auth";
 
@@ -24,7 +25,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
           <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-primary sm:text-4xl">Activity</h1>
           <p className="mt-2 text-sm text-muted">A chronological record of CRM changes made by your team.</p>
         </div>
-        <form className="flex flex-col gap-2 sm:flex-row">
+        <AutoSubmitFilterForm className="flex flex-col gap-2 sm:flex-row">
           <select name="entity" defaultValue={params.entity ?? ""} className="h-10 rounded-xl border border-cyan-300/15 bg-surface/60 px-3 text-xs font-bold text-primary outline-none focus:border-secondary">
             <option value="">All activity</option>
             {entities.map((entity) => <option key={entity} value={entity}>{entity.replaceAll("_", " ")}</option>)}
@@ -33,12 +34,11 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
             <option value="">All people</option>
             {workspace.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name}</option>)}
           </select>
-          <button className="h-10 rounded-xl border border-cyan-300/20 px-4 text-[10px] font-black uppercase tracking-widest text-secondary hover:bg-cyan-300/10">Filter</button>
-        </form>
+        </AutoSubmitFilterForm>
       </div>
 
-      <div className="mt-6 min-h-0 flex-1 overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60">
-        <div className="h-full divide-y divide-cyan-300/10 overflow-y-auto">
+      <div className="mt-6 min-h-0 overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60">
+        <div className="custom-scrollbar max-h-[min(42rem,calc(100dvh-18rem))] divide-y divide-cyan-300/10 overflow-y-auto">
           {filtered.length ? filtered.map((item) => (
             <article key={item.id} className="flex gap-4 p-4 sm:p-5">
               <span className="mt-0.5 rounded-xl bg-cyan-300/10 p-2 text-secondary"><Activity size={16} /></span>

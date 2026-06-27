@@ -342,16 +342,25 @@ export function ContentPlanner({
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-3 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true">
-          <form onSubmit={submit} className="max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-cyan-300/20 bg-surface p-5">
-            <div className="flex items-start justify-between gap-3">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeModal();
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <form onSubmit={submit} className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-300/20 bg-surface sm:max-h-[calc(100dvh-3rem)]">
+            <div className="shrink-0 border-b border-cyan-300/10 bg-surface/95 p-5 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">{selected ? "Update item" : "Create item"}</p>
                 <h2 className="mt-1 text-xl font-black text-primary">{selected ? selected.title : "New content plan"}</h2>
               </div>
               <button type="button" onClick={closeModal} className="rounded-lg p-2 text-muted hover:bg-cyan-300/10 hover:text-primary" aria-label="Close"><X size={16} /></button>
+              </div>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="custom-scrollbar grid flex-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
               <Field label="Title" name="title" defaultValue={selected?.title ?? ""} required />
               <Field label="Planned date" name="planned_for" type="date" defaultValue={selected?.planned_for ?? formatDateKey(new Date(selectedYear, selectedMonth, 1))} required />
               <Field label="Channel" name="channel" defaultValue={selected?.channel ?? "Website"} required />
@@ -430,7 +439,7 @@ export function ContentPlanner({
                 </div>
               </div>
             </div>
-            <div className="mt-5 flex gap-2">
+            <div className="shrink-0 flex gap-2 border-t border-cyan-300/10 bg-surface/95 p-5 backdrop-blur">
               <button disabled={busy} className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-60"><Save size={15} />{busy ? "Saving..." : "Save"}</button>
               {selected ? <button disabled={busy} type="button" onClick={remove} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-300/30 text-red-200 hover:bg-red-300/10" aria-label="Delete item"><Trash2 size={16} /></button> : null}
             </div>

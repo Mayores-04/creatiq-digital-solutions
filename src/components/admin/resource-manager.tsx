@@ -239,9 +239,10 @@ export function ResourceManager({
   const editorForm = (
     <form
       onSubmit={submit}
-      className={`${editorMode === "modal" ? "w-full overflow-hidden" : "h-fit"} rounded-2xl border border-cyan-300/20 bg-surface shadow-[0_0_34px_rgba(8,189,255,0.06)]`}
+      className={`${editorMode === "modal" ? "flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]" : "h-fit"} rounded-2xl border border-cyan-300/20 bg-surface shadow-[0_0_34px_rgba(8,189,255,0.06)]`}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-cyan-300/10 bg-surface/95 p-4 backdrop-blur sm:p-5">
+      <div className="shrink-0 border-b border-cyan-300/10 bg-surface/95 p-4 backdrop-blur sm:p-5">
+        <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">
             {isCreating ? "Create record" : "Update record"}
@@ -264,12 +265,13 @@ export function ResourceManager({
             <X size={16} />
           </button>
         )}
+        </div>
       </div>
 
       <div
         className={
           editorMode === "modal"
-            ? "grid gap-4 p-4 sm:p-5 md:grid-cols-2"
+            ? "custom-scrollbar grid flex-1 gap-4 overflow-y-auto p-4 sm:p-5 md:grid-cols-2"
             : "space-y-3 p-4 sm:p-5"
         }
       >
@@ -294,7 +296,7 @@ export function ResourceManager({
         ))}
       </div>
 
-      <div className="sticky bottom-0 z-10 flex gap-2 border-t border-cyan-300/10 bg-surface/95 p-4 backdrop-blur sm:p-5">
+      <div className="shrink-0 flex gap-2 border-t border-cyan-300/10 bg-surface/95 p-4 backdrop-blur sm:p-5">
         <button
           disabled={busy}
           className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60"
@@ -479,11 +481,14 @@ export function ResourceManager({
       {editorMode === "modal" && editorOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeEditor();
+          }}
           role="dialog"
           aria-modal="true"
           aria-label={formTitle}
         >
-          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl overflow-y-auto rounded-2xl sm:max-h-[calc(100dvh-3rem)]">
+          <div className="w-full max-w-5xl rounded-2xl">
             {editorForm}
           </div>
         </div>

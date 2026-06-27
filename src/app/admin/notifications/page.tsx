@@ -1,4 +1,5 @@
 import { Activity, Bell, ShieldCheck } from "lucide-react";
+import { AutoSubmitFilterForm } from "@/components/admin/auto-submit-filter-form";
 import { NotificationSettings } from "@/components/admin/notification-settings";
 import { PaginationControls, type PageSize } from "@/components/admin/pagination-controls";
 import { requireModuleAccess } from "@/lib/crm/auth";
@@ -46,7 +47,7 @@ export default async function AdminNotificationsPage({ searchParams }: { searchP
   const total = activityResult.count ?? notifications.length;
 
   return (
-    <section className="flex min-h-[calc(100dvh-8rem)] flex-col gap-5">
+    <section className="flex min-h-0 flex-col gap-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-secondary">Activity Center</p>
@@ -58,14 +59,14 @@ export default async function AdminNotificationsPage({ searchParams }: { searchP
         </a>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60">
+      <div className="grid min-h-0 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex h-[calc(100dvh-14.5rem)] min-h-[34rem] flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-surface/60 xl:max-h-[48rem]">
           <div className="flex flex-col gap-3 border-b border-cyan-300/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-secondary">See all notifications</p>
               <p className="mt-1 text-xs text-muted">Showing CRM updates and workspace alerts.</p>
             </div>
-            <form className="flex flex-wrap items-center gap-2">
+            <AutoSubmitFilterForm className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="limit" value={pageSize} />
               <select name="type" defaultValue={type} className="h-10 rounded-xl border border-cyan-300/15 bg-background/60 px-3 text-xs font-bold text-primary outline-none focus:border-secondary">
                 <option value="">All</option>
@@ -73,12 +74,11 @@ export default async function AdminNotificationsPage({ searchParams }: { searchP
                 <option value="reviews">Customer reviews</option>
                 <option value="content">Content planner</option>
               </select>
-              <button className="h-10 rounded-xl border border-cyan-300/20 px-4 text-[10px] font-black uppercase tracking-widest text-secondary hover:bg-cyan-300/10">Filter</button>
               <span className="rounded-full bg-cyan-300/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-secondary">{total} total</span>
-            </form>
+            </AutoSubmitFilterForm>
           </div>
 
-          <div className="min-h-0 flex-1 divide-y divide-cyan-300/10 overflow-y-auto">
+          <div className="custom-scrollbar min-h-0 flex-1 divide-y divide-cyan-300/10 overflow-y-auto">
             {notifications.length ? notifications.map((item) => (
               <NotificationRow key={item.id} item={item} actorName={item.actor_id ? names.get(item.actor_id) ?? "Team member" : "System"} />
             )) : (
@@ -106,7 +106,7 @@ function NotificationRow({ item, actorName }: { item: ActivityRecord; actorName:
   const Icon = security ? ShieldCheck : Activity;
   const details = formatDetails(item.details);
   return (
-    <article className="flex gap-4 p-5 transition hover:bg-cyan-300/[0.04]">
+    <article className="flex gap-4 px-5 py-4 transition hover:bg-cyan-300/[0.04]">
       <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-300/10 text-secondary"><Icon size={17} /></span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
