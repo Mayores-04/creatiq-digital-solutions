@@ -6,16 +6,18 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { deleteAccessRole, inviteStaff, saveAccessRole, setUserAccessRole, setUserActive, setUserRole } from "@/app/admin/actions";
 import { ADMIN_MODULES } from "@/lib/crm/constants";
-import type { AccessRoleRecord, ProfileRecord } from "@/lib/crm/types";
+import type { AccessRoleRecord, AdminSecurityRequestRecord, ProfileRecord } from "@/lib/crm/types";
 
 export function UserManagement({
   profiles,
   currentUserId,
   accessRoles,
+  securityRequests = [],
 }: {
   profiles: ProfileRecord[];
   currentUserId: string;
   accessRoles: AccessRoleRecord[];
+  securityRequests?: AdminSecurityRequestRecord[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,7 @@ export function UserManagement({
       fullName: String(values.get("fullName") ?? ""),
       jobTitle: String(values.get("jobTitle") ?? ""),
       role: String(values.get("role") ?? "STAFF") as "ADMIN" | "STAFF",
+      accessRoleId: String(values.get("accessRoleId") ?? "") || null,
     });
     setBusy(false);
     if (!result.ok) toast.error("Could not invite user", { description: result.error });
@@ -149,17 +152,25 @@ export function UserManagement({
             <Send size={17} className="text-secondary" />
             <h2 className="font-black text-primary">Invite a user</h2>
           </div>
-          <p className="mt-2 text-xs leading-5 text-muted">The invite creates a secure Auth account and employee profile. Send Staff by default; create an Admin only when needed.</p>
+          <p className="mt-2 text-xs leading-5 text-muted">The invite creates a secure Auth account and employee profile. Choose their core security level and module-access profile before sending.</p>
           <div className="mt-5 space-y-3">
             <Field label="Full name" name="fullName" required />
             <Field label="Work email" name="email" type="email" required />
-            <Field label="Job title / role" name="jobTitle" placeholder="Full-Stack Developer, Graphic Designer..." />
+            <Field label="Title / Job title" name="jobTitle" placeholder="Full-Stack Developer, Graphic Designer..." />
             <label className="block">
               <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Core security level</span>
               <select name="role" defaultValue="STAFF" className="mt-1.5 h-11 w-full rounded-xl border border-cyan-300/15 bg-background/60 px-3 text-sm text-primary outline-none focus:border-secondary">
                 <option value="STAFF">Staff / Employee</option>
                 <option value="ADMIN">Admin</option>
               </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Module access profile</span>
+              <select name="accessRoleId" defaultValue="" className="mt-1.5 h-11 w-full rounded-xl border border-cyan-300/15 bg-background/60 px-3 text-sm text-primary outline-none focus:border-secondary">
+                <option value="">Default staff access</option>
+                {accessRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              </select>
+              <span className="mt-1 block text-[11px] text-muted">Used for Staff accounts. Admins always receive full module access.</span>
             </label>
           </div>
           <button disabled={busy} className="primary-btn mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-60">
@@ -187,14 +198,19 @@ export function UserManagement({
                         {isSelf && <span className="ml-2 rounded-full bg-cyan-300/10 px-2 py-1 text-[9px] font-bold text-secondary">YOU</span>}
                       </p>
                       <p className="mt-1 text-xs text-muted">{profile.email}{profile.job_title ? ` - ${profile.job_title}` : ""}</p>
+                      {securityRequests.some((request) => request.target_profile_id === profile.id) ? (
+                        <p className="mt-2 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-200">
+                          Pending admin confirmation
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${profile.is_active ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-300/10 text-amber-200"}`}>
                         {profile.is_active ? "ACTIVE" : "INACTIVE"}
                       </span>
                       <select value={profile.role} disabled={isSelf || busy} onChange={(event) => changeRole(profile.id, event.target.value as "ADMIN" | "STAFF")} className="rounded-lg border border-cyan-300/20 bg-background/60 px-2 py-1.5 text-xs font-bold text-primary outline-none focus:border-secondary disabled:cursor-not-allowed disabled:opacity-50">
-                        <option value="ADMIN">ADMIN</option>
-                        <option value="STAFF">STAFF</option>
+                        <option value="ADMIN">Core: Admin</option>
+                        <option value="STAFF">Core: Staff</option>
                       </select>
                       <button type="button" disabled={(isSelf && profile.is_active) || busy} onClick={() => changeAccess(profile, !profile.is_active)} className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-black uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-45 ${profile.is_active ? "border-red-300/25 text-red-200 hover:bg-red-300/10" : "border-emerald-300/25 text-emerald-200 hover:bg-emerald-300/10"}`}>
                         <Power size={13} />
@@ -203,7 +219,7 @@ export function UserManagement({
                     </div>
                   </div>
                   <label className="block max-w-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Module access role</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Module access profile</span>
                     <select value={profile.access_role_id ?? ""} disabled={isSelf || busy || profile.role === "ADMIN"} onChange={(event) => changeAccessRole(profile.id, event.target.value)} className="mt-1.5 h-10 w-full rounded-xl border border-cyan-300/15 bg-background/60 px-3 text-xs text-primary outline-none focus:border-secondary disabled:cursor-not-allowed disabled:opacity-50">
                       <option value="">Default staff access</option>
                       {accessRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
@@ -279,11 +295,11 @@ export function UserManagement({
               <button type="button" onClick={() => setPendingDeactivation(null)} className="rounded-lg p-2 text-muted hover:bg-cyan-300/10 hover:text-primary" aria-label="Close confirmation"><X size={16} /></button>
             </div>
             <p className="mt-4 text-sm leading-6 text-muted">
-              You are about to deactivate <span className="font-bold text-primary">{pendingDeactivation.full_name}</span>. They will receive an email notice and lose CRM access until another Admin reactivates the account.
+              You are requesting to deactivate <span className="font-bold text-primary">{pendingDeactivation.full_name}</span>. They will receive a secure email link and must confirm using their own password before the account is deactivated.
             </p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <button type="button" onClick={() => setPendingDeactivation(null)} className="h-11 flex-1 rounded-xl border border-cyan-300/20 text-xs font-black uppercase tracking-widest text-muted hover:bg-cyan-300/10">Cancel</button>
-              <button type="button" disabled={busy} onClick={() => changeAccess(pendingDeactivation, false, true)} className="h-11 flex-1 rounded-xl bg-red-400/15 text-xs font-black uppercase tracking-widest text-red-100 hover:bg-red-400/20 disabled:opacity-60">Confirm deactivate</button>
+              <button type="button" disabled={busy} onClick={() => changeAccess(pendingDeactivation, false, true)} className="h-11 flex-1 rounded-xl bg-red-400/15 text-xs font-black uppercase tracking-widest text-red-100 hover:bg-red-400/20 disabled:opacity-60">Send confirm link</button>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { requireAdmin } from "./auth";
 import type {
   ActivityRecord,
   AccessRoleRecord,
+  AdminSecurityRequestRecord,
   AdminWorkspace,
   ClientRecord,
   CompanySettingsRecord,
@@ -37,10 +38,13 @@ export async function getAdminWorkspace(): Promise<AdminWorkspace> {
   const supabase = await createSupabaseServerClient();
 
   const adminOnly = identity.role === "ADMIN";
-  const [profilesResult, accessRolesResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, settingsResult] = await Promise.all([
+  const [profilesResult, accessRolesResult, securityRequestsResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, settingsResult] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, role, access_role_id, job_title, is_active").order("full_name"),
     adminOnly
       ? supabase.from("access_roles").select("id, name, description, permissions, is_system, created_at").order("name")
+      : Promise.resolve({ data: [], error: null }),
+    adminOnly
+      ? supabase.from("admin_security_requests").select("id, request_token, action, target_profile_id, requested_by, requested_role, status, expires_at, created_at").eq("status", "PENDING").order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     supabase.from("clients").select("id, company_name, contact_name, email, phone, notes, created_at").order("created_at", { ascending: false }),
     supabase.from("inquiries").select("id, name, email, services, description, status, internal_notes, client_id, project_id, created_at").order("created_at", { ascending: false }),
@@ -86,6 +90,7 @@ export async function getAdminWorkspace(): Promise<AdminWorkspace> {
       ...role,
       permissions: Array.isArray(role.permissions) ? role.permissions.map(String) : [],
     })),
+    adminSecurityRequests: rows(securityRequestsResult as QueryResult<AdminSecurityRequestRecord[]>, "admin security requests"),
     clients: rows(clientsResult as QueryResult<ClientRecord[]>, "clients"),
     inquiries: rows(inquiriesResult as QueryResult<InquiryRecord[]>, "inquiries").map((inquiry) => ({
       ...inquiry,

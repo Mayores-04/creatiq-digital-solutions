@@ -148,6 +148,18 @@ export type AccessRoleRecord = {
   created_at: string;
 };
 
+export type AdminSecurityRequestRecord = {
+  id: string;
+  request_token: string;
+  action: "DEACTIVATE_ADMIN" | "CHANGE_ADMIN_ROLE";
+  target_profile_id: string;
+  requested_by: string | null;
+  requested_role: "ADMIN" | "STAFF" | null;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "EXPIRED";
+  expires_at: string;
+  created_at: string;
+};
+
 export type ContentPlannerItemRecord = {
   id: string;
   title: string;
@@ -188,6 +200,7 @@ export type AdminWorkspace = {
   identity: { id: string; role: AdminRole; fullName: string; email: string; permissions: AdminModuleKey[] };
   profiles: ProfileRecord[];
   accessRoles: AccessRoleRecord[];
+  adminSecurityRequests: AdminSecurityRequestRecord[];
   clients: ClientRecord[];
   inquiries: InquiryRecord[];
   projects: ProjectRecord[];

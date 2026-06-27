@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
 import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseConfig } from "@/lib/supabase/config";
+import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const resourceSchema = z.enum(["inquiries", "clients", "projects", "tasks", "services", "employees"]);
@@ -98,6 +101,18 @@ function authPasswordSetupUrl() {
   return appUrl ? new URL("/auth/set-password", appUrl).toString() : undefined;
 }
 
+function appUrl(path: string) {
+  const configuredBase = process.env.NEXT_PUBLIC_APP_URL ?? process.env.FRONTEND_URL;
+  const base =
+    process.env.NODE_ENV === "development" &&
+    configuredBase &&
+    !configuredBase.includes("localhost") &&
+    !configuredBase.includes("127.0.0.1")
+      ? "http://localhost:3000"
+      : configuredBase;
+  return base ? new URL(path, base).toString() : path;
+}
+
 function allowedPermissions(values: unknown) {
   const allowed = new Set(ADMIN_MODULES.map((module) => module.key));
   return Array.isArray(values)
@@ -159,6 +174,69 @@ async function sendAccountNotice({
   } catch (error) {
     console.error("Unable to send account notice:", error);
   }
+}
+
+async function createAdminSecurityRequest({
+  action,
+  targetProfileId,
+  requestedBy,
+  requestedRole,
+  details = {},
+}: {
+  action: "DEACTIVATE_ADMIN" | "CHANGE_ADMIN_ROLE";
+  targetProfileId: string;
+  requestedBy: string;
+  requestedRole?: "ADMIN" | "STAFF" | null;
+  details?: Record<string, unknown>;
+}) {
+  const admin = createSupabaseAdminClient();
+  await admin
+    .from("admin_security_requests")
+    .update({ status: "EXPIRED" })
+    .eq("target_profile_id", targetProfileId)
+    .eq("action", action)
+    .eq("status", "PENDING");
+
+  const { data, error } = await admin
+    .from("admin_security_requests")
+    .insert({
+      action,
+      target_profile_id: targetProfileId,
+      requested_by: requestedBy,
+      requested_role: requestedRole ?? null,
+      details,
+    })
+    .select("request_token")
+    .single();
+
+  if (error || !data) throw new Error(error?.message ?? "Unable to create confirmation request.");
+  return String(data.request_token);
+}
+
+async function sendAdminConfirmationEmail({
+  to,
+  name,
+  action,
+  token,
+  requestedRole,
+}: {
+  to: string;
+  name: string;
+  action: "DEACTIVATE_ADMIN" | "CHANGE_ADMIN_ROLE";
+  token: string;
+  requestedRole?: "ADMIN" | "STAFF" | null;
+}) {
+  const link = appUrl(`/admin/security-confirm/${token}`);
+  const actionText =
+    action === "DEACTIVATE_ADMIN"
+      ? "deactivate your Admin account"
+      : `change your core security level to ${requestedRole}`;
+  await sendAccountNotice({
+    to,
+    name,
+    subject: "Creatiq CRM admin confirmation required",
+    message: `An Admin requested to ${actionText}. For security, this will not apply until you confirm it using your own password. Confirmation link: ${link}`,
+  });
 }
 
 export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
@@ -456,7 +534,7 @@ export async function updateCompanySettings(values: Record<string, unknown>): Pr
   }
 }
 
-export async function inviteStaff(values: { email: string; fullName: string; jobTitle?: string; role?: "ADMIN" | "STAFF" }): Promise<ActionResult> {
+export async function inviteStaff(values: { email: string; fullName: string; jobTitle?: string; role?: "ADMIN" | "STAFF"; accessRoleId?: string | null }): Promise<ActionResult> {
   try {
     const identity = await requireAdmin();
     ownerOnly(identity.role);
@@ -464,6 +542,7 @@ export async function inviteStaff(values: { email: string; fullName: string; job
     const fullName = z.string().trim().min(2).max(160).parse(values.fullName);
     const jobTitle = z.string().trim().max(160).optional().parse(values.jobTitle)?.trim() || null;
     const role = values.role === "ADMIN" ? "ADMIN" : "STAFF";
+    const accessRoleId = role === "STAFF" && values.accessRoleId ? z.uuid().parse(values.accessRoleId) : null;
     const admin = createSupabaseAdminClient();
     const redirectTo = authPasswordSetupUrl();
 
@@ -491,10 +570,11 @@ export async function inviteStaff(values: { email: string; fullName: string; job
       full_name: fullName,
       job_title: jobTitle,
       role,
+      access_role_id: accessRoleId,
       is_active: true,
     }).eq("id", data.user.id);
     if (profileError) throw new Error(profileError.message);
-    await logActivity("profile", data.user.id, "user_invited", { email, role });
+    await logActivity("profile", data.user.id, "user_invited", { email, role, accessRoleId });
     refreshCrm();
     return { ok: true, message: `Invitation sent to ${email}.` };
   } catch (error) {
@@ -515,6 +595,27 @@ export async function setUserRole(profileId: string, role: "ADMIN" | "STAFF"): P
       .eq("id", profileId)
       .single();
     if (targetProfileError || !targetProfile) throw new Error(targetProfileError?.message ?? "User profile not found.");
+
+    if (targetProfile.role === "ADMIN" && role !== targetProfile.role) {
+      const token = await createAdminSecurityRequest({
+        action: "CHANGE_ADMIN_ROLE",
+        targetProfileId: profileId,
+        requestedBy: identity.id,
+        requestedRole: role,
+        details: { from: targetProfile.role, to: role },
+      });
+      await sendAdminConfirmationEmail({
+        to: targetProfile.email,
+        name: targetProfile.full_name,
+        action: "CHANGE_ADMIN_ROLE",
+        token,
+        requestedRole: role,
+      });
+      await logActivity("profile", profileId, "role_change_confirmation_requested", { role });
+      refreshCrm();
+      return { ok: true, message: `Confirmation link sent to ${targetProfile.full_name}. Their role will change after they confirm with their password.` };
+    }
+
     const { error } = await supabase.from("profiles").update({ role }).eq("id", profileId);
     if (error) throw new Error(error.message);
     await logActivity("profile", profileId, "role_updated", { role });
@@ -533,8 +634,9 @@ export async function setUserRole(profileId: string, role: "ADMIN" | "STAFF"): P
   }
 }
 
-export async function setUserActive(profileId: string, isActive: boolean, confirmedCoAdmin = false): Promise<ActionResult> {
+export async function setUserActive(profileId: string, isActive: boolean, _confirmedCoAdmin = false): Promise<ActionResult> {
   try {
+    void _confirmedCoAdmin;
     z.uuid().parse(profileId);
     const identity = await requireAdmin();
     ownerOnly(identity.role);
@@ -547,8 +649,22 @@ export async function setUserActive(profileId: string, isActive: boolean, confir
       .eq("id", profileId)
       .single();
     if (targetProfileError || !targetProfile) throw new Error(targetProfileError?.message ?? "User profile not found.");
-    if (targetProfile.role === "ADMIN" && !isActive && !confirmedCoAdmin) {
-      throw new Error("Confirm that you want to deactivate this co-admin account first.");
+    if (targetProfile.role === "ADMIN" && !isActive) {
+      const token = await createAdminSecurityRequest({
+        action: "DEACTIVATE_ADMIN",
+        targetProfileId: profileId,
+        requestedBy: identity.id,
+        details: { previousActive: targetProfile.is_active },
+      });
+      await sendAdminConfirmationEmail({
+        to: targetProfile.email,
+        name: targetProfile.full_name,
+        action: "DEACTIVATE_ADMIN",
+        token,
+      });
+      await logActivity("profile", profileId, "deactivation_confirmation_requested", { email: targetProfile.email });
+      refreshCrm();
+      return { ok: true, message: `Confirmation link sent to ${targetProfile.full_name}. The account stays active until they confirm with their password.` };
     }
 
     const { error } = await supabase.from("profiles").update({ is_active: isActive }).eq("id", profileId);
@@ -624,6 +740,74 @@ export async function deleteAccessRole(id: string): Promise<ActionResult> {
     return { ok: true, message: "Access role deleted." };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to delete access role." };
+  }
+}
+
+export async function confirmAdminSecurityRequest(token: string, password: string): Promise<ActionResult> {
+  try {
+    const requestToken = z.uuid().parse(token);
+    if (!password) throw new Error("Enter your password to confirm this request.");
+
+    const admin = createSupabaseAdminClient();
+    const { data: request, error: requestError } = await admin
+      .from("admin_security_requests")
+      .select("id, action, target_profile_id, requested_role, status, expires_at")
+      .eq("request_token", requestToken)
+      .single();
+    if (requestError || !request) throw new Error(requestError?.message ?? "Confirmation request not found.");
+    if (request.status !== "PENDING") throw new Error("This confirmation request is no longer pending.");
+    if (new Date(request.expires_at).getTime() < Date.now()) {
+      await admin.from("admin_security_requests").update({ status: "EXPIRED" }).eq("id", request.id);
+      throw new Error("This confirmation link has expired. Ask another Admin to send a new request.");
+    }
+
+    const { data: targetProfile, error: targetError } = await admin
+      .from("profiles")
+      .select("id, email, full_name, role")
+      .eq("id", request.target_profile_id)
+      .single();
+    if (targetError || !targetProfile) throw new Error(targetError?.message ?? "Admin profile not found.");
+
+    const { url, publishableKey } = getSupabaseConfig();
+    const verifier = createClient(url, publishableKey, {
+      global: { fetch: fetchWithSupabaseTimeout },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    });
+    const { error: signInError } = await verifier.auth.signInWithPassword({
+      email: targetProfile.email,
+      password,
+    });
+    if (signInError) throw new Error("Password confirmation failed. Please check your password and try again.");
+    await verifier.auth.signOut();
+
+    if (request.action === "DEACTIVATE_ADMIN") {
+      const { error } = await admin.from("profiles").update({ is_active: false }).eq("id", targetProfile.id);
+      if (error) throw new Error(error.message);
+    } else if (request.action === "CHANGE_ADMIN_ROLE") {
+      const nextRole = z.enum(["ADMIN", "STAFF"]).parse(request.requested_role);
+      const { error } = await admin.from("profiles").update({ role: nextRole }).eq("id", targetProfile.id);
+      if (error) throw new Error(error.message);
+    }
+
+    await admin
+      .from("admin_security_requests")
+      .update({ status: "CONFIRMED", confirmed_at: new Date().toISOString() })
+      .eq("id", request.id);
+    await admin.from("activity_logs").insert({
+      actor_id: targetProfile.id,
+      entity_type: "admin_security_request",
+      entity_id: request.id,
+      action: request.action.toLowerCase(),
+      details: { targetProfileId: targetProfile.id },
+    });
+    refreshCrm();
+    return { ok: true, message: "Security request confirmed. The requested access change has been applied." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to confirm this request." };
   }
 }
 
