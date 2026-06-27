@@ -4,7 +4,11 @@ import { getAdminWorkspace } from "@/lib/crm/admin-data";
 import { INQUIRY_STATUSES } from "@/lib/crm/constants";
 
 export default async function InquiriesPage() {
-  const workspace = await getAdminWorkspace();
+  const workspace = await getAdminWorkspace({
+    inquiries: true,
+    clients: true,
+    projects: true,
+  });
   const isOwner = workspace.identity.role === "ADMIN";
   const clientOptions = workspace.clients.map((client) => ({ value: client.id, label: client.company_name }));
   const projectOptions = workspace.projects.map((project) => ({ value: project.id, label: project.name }));

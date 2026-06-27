@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
 import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
+import { clearPublicSiteDataCache } from "@/lib/crm/public-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
@@ -88,6 +89,7 @@ async function logActivity(
 }
 
 function refreshCrm() {
+  clearPublicSiteDataCache();
   revalidatePath("/");
   revalidatePath("/admin", "layout");
 }

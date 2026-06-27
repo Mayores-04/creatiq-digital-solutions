@@ -12,7 +12,16 @@ import {
 } from "@/lib/crm/constants";
 
 export default async function ProjectsPage() {
-  const workspace = await getAdminWorkspace();
+  const workspace = await getAdminWorkspace({
+    projects: true,
+    projectServices: true,
+    projectMembers: true,
+    contributors: true,
+    documents: true,
+    services: true,
+    clients: true,
+    profiles: true,
+  });
   const isAdmin = workspace.identity.role === "ADMIN";
   const serviceOptions = workspace.services.map((service) => ({
     value: service.id,

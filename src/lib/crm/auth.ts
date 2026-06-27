@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_MODULES, type AdminModuleKey, type AdminRole } from "./constants";
@@ -16,7 +17,7 @@ export type AdminIdentity = {
   permissions: AdminModuleKey[];
 };
 
-export async function getAdminIdentity(): Promise<AdminIdentity | null> {
+export const getAdminIdentity = cache(async (): Promise<AdminIdentity | null> => {
   // Avoid a remote auth request for visitors who have never signed in. This
   // keeps the /admin redirect immediate when the database is unavailable.
   const cookieStore = await cookies();
@@ -76,7 +77,7 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
     // protected admin route simply redirects to its sign-in screen.
     return null;
   }
-}
+});
 
 export async function requireAdmin(allowedRoles?: AdminRole[]) {
   const identity = await getAdminIdentity();

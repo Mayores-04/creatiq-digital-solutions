@@ -94,12 +94,12 @@ export function AdminHeader({
         </button>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="truncate text-sm font-black text-primary sm:text-base">
-            {identity.fullName}
+          <p className="truncate text-[10px] font-black uppercase tracking-[0.22em] text-secondary">
+            Admin workspace
           </p>
 
-          <p className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-secondary sm:text-[10px]">
-            {identity.role}
+          <p className="hidden truncate text-xs text-muted sm:block">
+            Manage Creatiq CRM operations
           </p>
         </div>
       </div>

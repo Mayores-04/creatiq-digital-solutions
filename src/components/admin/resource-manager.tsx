@@ -101,6 +101,8 @@ export function ResourceManager({
   canDelete = false,
   emptyMessage = "No records yet.",
   editorMode = "panel",
+  editInModal = false,
+  hideCreateButton = false,
   currentUserId,
   filterKeys,
 }: {
@@ -114,6 +116,8 @@ export function ResourceManager({
   canDelete?: boolean;
   emptyMessage?: string;
   editorMode?: EditorMode;
+  editInModal?: boolean;
+  hideCreateButton?: boolean;
   currentUserId?: string;
   filterKeys?: string[];
 }) {
@@ -127,6 +131,8 @@ export function ResourceManager({
   const [filter, setFilter] = useState("");
 
   const isCreating = selected === null;
+  const formIsModal = editorMode === "modal" || (editInModal && !isCreating);
+  const showInlineEditor = editorMode === "panel" && !formIsModal && (canCreate || !isCreating);
   const formTitle = isCreating
     ? `New ${title.slice(0, -1)}`
     : `Edit ${title.slice(0, -1)}`;
@@ -206,7 +212,7 @@ export function ResourceManager({
     toast.success(result.message);
     router.refresh();
 
-    if (editorMode === "modal") closeEditor();
+    if (formIsModal) closeEditor();
     else if (isCreating) newRecord();
   }
 
@@ -239,7 +245,7 @@ export function ResourceManager({
   const editorForm = (
     <form
       onSubmit={submit}
-      className={`${editorMode === "modal" ? "flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]" : "h-fit"} rounded-2xl border border-cyan-300/20 bg-surface shadow-[0_0_34px_rgba(8,189,255,0.06)]`}
+      className={`${formIsModal ? "flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden sm:max-h-[calc(100dvh-3rem)]" : "h-fit"} rounded-2xl border border-cyan-300/20 bg-surface shadow-[0_0_34px_rgba(8,189,255,0.06)]`}
     >
       <div className="shrink-0 border-b border-cyan-300/10 bg-surface/95 p-4 backdrop-blur sm:p-5">
         <div className="flex items-center justify-between gap-3">
@@ -248,14 +254,14 @@ export function ResourceManager({
             {isCreating ? "Create record" : "Update record"}
           </p>
           <h2 className="mt-1 text-lg font-black text-primary">{formTitle}</h2>
-          {editorMode === "modal" ? (
+          {formIsModal ? (
             <p className="mt-1 text-xs text-muted">
               Details are grouped in two columns for faster editing.
             </p>
           ) : null}
         </div>
 
-        {(!isCreating || editorMode === "modal") && (
+        {(!isCreating || formIsModal) && (
           <button
             type="button"
             onClick={closeEditor}
@@ -270,7 +276,7 @@ export function ResourceManager({
 
       <div
         className={
-          editorMode === "modal"
+          formIsModal
             ? "custom-scrollbar grid flex-1 gap-4 overflow-y-auto p-4 sm:p-5 md:grid-cols-2"
             : "space-y-3 p-4 sm:p-5"
         }
@@ -345,7 +351,7 @@ export function ResourceManager({
             />
           ) : null}
 
-          {canCreate ? (
+          {canCreate && !hideCreateButton ? (
             <button
               type="button"
               onClick={newRecord}
@@ -359,7 +365,7 @@ export function ResourceManager({
 
       <div
         className={
-          editorMode === "modal"
+          editorMode === "modal" || !showInlineEditor
             ? ""
             : "grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"
         }
@@ -475,10 +481,10 @@ export function ResourceManager({
           )}
         </div>
 
-        {editorMode === "panel" && editorForm}
+        {showInlineEditor && editorForm}
       </div>
 
-      {editorMode === "modal" && editorOpen ? (
+      {(editorMode === "modal" || (editInModal && !isCreating)) && editorOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 p-3 backdrop-blur-sm sm:items-center sm:p-6"
           onMouseDown={(event) => {

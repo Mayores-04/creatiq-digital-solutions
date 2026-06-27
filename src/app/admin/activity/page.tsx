@@ -7,7 +7,10 @@ type SearchParams = Promise<{ entity?: string; actor?: string }>;
 
 export default async function ActivityPage({ searchParams }: { searchParams: SearchParams }) {
   await requireModuleAccess("activity");
-  const workspace = await getAdminWorkspace();
+  const workspace = await getAdminWorkspace({
+    activity: true,
+    profiles: true,
+  });
   const params = await searchParams;
   const names = new Map(workspace.profiles.map((profile) => [profile.id, profile.full_name]));
   const entities = Array.from(new Set(workspace.activity.map((item) => item.entity_type))).sort();

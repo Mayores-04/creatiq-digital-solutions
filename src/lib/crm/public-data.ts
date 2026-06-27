@@ -8,6 +8,7 @@ import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
 export type PublicService = { slug: string; title: string; description: string; icon_name: string };
 export type PublicProject = { slug: string; category: string; service_slugs: string[]; service_titles: string[]; title: string; summary: string; image_url: string | null; project_url: string | null; technologies: string[]; project_date: string | null; project_type: string };
 export type PublicReview = { customer_name: string; rating: number; testimonial: string; project_name: string | null };
+export type PublicSiteData = { settings: PublicCompanySettings; services: PublicService[]; projects: PublicProject[]; reviews: PublicReview[]; stats: { projects: number; active: number; won: number; inquiries: number } };
 export type PublicCompanySettings = {
   company_name: string;
   company_email: string;
@@ -33,23 +34,28 @@ const fallbackProjects: PublicProject[] = [
   { slug: "business-website-platform", category: "Web & Custom Systems", service_slugs: ["web-custom-systems"], service_titles: ["Web & Custom Systems"], title: "Business Website Platform", summary: "Modern website design with responsive and conversion-focused UI.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
 ];
 
-const fallbackSiteData = { settings: DEFAULT_COMPANY_SETTINGS, services: fallbackServices, projects: fallbackProjects, reviews: [] as PublicReview[], stats: { projects: fallbackProjects.length, active: 0, won: 0, inquiries: 0 } };
+const fallbackSiteData: PublicSiteData = { settings: DEFAULT_COMPANY_SETTINGS, services: fallbackServices, projects: fallbackProjects, reviews: [], stats: { projects: fallbackProjects.length, active: 0, won: 0, inquiries: 0 } };
+const PUBLIC_SITE_CACHE_MS = 15_000;
 let unavailableUntil = 0;
+let cachedSiteData: { expiresAt: number; data: PublicSiteData } | null = null;
 
-export async function getPublicSiteData() {
+export function clearPublicSiteDataCache() {
+  cachedSiteData = null;
+}
+
+export async function getPublicSiteData(): Promise<PublicSiteData> {
+  if (cachedSiteData && Date.now() < cachedSiteData.expiresAt) return cachedSiteData.data;
   if (!hasSupabaseConfig() || Date.now() < unavailableUntil) return fallbackSiteData;
 
   try {
     const { url, publishableKey } = getSupabaseConfig();
     const supabase = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchWithSupabaseTimeout } });
-    const [settingsResult, servicesResult, projectsResult, reviewsResult, projectCountResult, activeCountResult, wonCountResult, inquiriesCountResult] = await Promise.all([
+    const [settingsResult, servicesResult, projectsResult, reviewsResult, projectStatsResult, inquiriesCountResult] = await Promise.all([
       supabase.from("company_settings").select("company_name, company_email, location, logo_url, favicon_url, social_links").eq("id", true).maybeSingle(),
       supabase.from("services").select("slug, title, description, icon_name").eq("is_published", true).order("sort_order"),
       supabase.from("projects").select("slug, category, name, description, image_url, project_url, technologies, project_date, project_type, primary_service:services!projects_service_id_fkey(slug, title), project_services(services!project_services_service_id_fkey(slug, title))").eq("is_published", true).order("sort_order"),
-      supabase.from("customer_reviews").select("customer_name, rating, testimonial, projects(name)").eq("status", "APPROVED").order("published_at", { ascending: false }),
-      supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_published", true),
-      supabase.from("projects").select("id", { count: "exact", head: true }).in("status", ["ACTIVE", "REVIEW"]),
-      supabase.from("projects").select("id", { count: "exact", head: true }).eq("lead_outcome", "WON"),
+      supabase.from("customer_reviews").select("customer_name, rating, testimonial, projects(name)").eq("status", "APPROVED").order("published_at", { ascending: false }).limit(12),
+      supabase.from("projects").select("status, lead_outcome, is_published"),
       supabase.from("inquiries").select("id", { count: "exact", head: true }),
     ]);
 
@@ -58,16 +64,15 @@ export async function getPublicSiteData() {
       servicesResult.error ||
       projectsResult.error ||
       reviewsResult.error ||
-      projectCountResult.error ||
-      activeCountResult.error ||
-      wonCountResult.error ||
+      projectStatsResult.error ||
       inquiriesCountResult.error
     ) {
       throw new Error("The public CMS query could not reach Supabase.");
     }
 
     const setting = settingsResult.data;
-    return {
+    const projectStats = projectStatsResult.data ?? [];
+    const data: PublicSiteData = {
       settings: setting ? {
         company_name: setting.company_name,
         company_email: setting.company_email,
@@ -101,8 +106,16 @@ export async function getPublicSiteData() {
         };
       }) as PublicProject[] : fallbackProjects,
       reviews: reviewsResult.data?.flatMap((review) => review.customer_name && review.rating && review.testimonial ? [{ customer_name: review.customer_name, rating: review.rating, testimonial: review.testimonial, project_name: Array.isArray(review.projects) ? review.projects[0]?.name ?? null : (review.projects as { name?: string } | null)?.name ?? null }] : []) as PublicReview[] ?? [],
-      stats: { projects: projectCountResult.count ?? 0, active: activeCountResult.count ?? 0, won: wonCountResult.count ?? 0, inquiries: inquiriesCountResult.count ?? 0 },
+      stats: {
+        projects: projectStats.filter((project) => project.is_published).length,
+        active: projectStats.filter((project) => ["ACTIVE", "REVIEW"].includes(project.status ?? "")).length,
+        won: projectStats.filter((project) => project.lead_outcome === "WON").length,
+        inquiries: inquiriesCountResult.count ?? 0,
+      },
     };
+
+    cachedSiteData = { data, expiresAt: Date.now() + PUBLIC_SITE_CACHE_MS };
+    return data;
   } catch {
     unavailableUntil = Date.now() + 30_000;
     console.warn("Public CMS is temporarily unavailable; using local fallback content.");

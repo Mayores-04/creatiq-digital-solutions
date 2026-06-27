@@ -22,6 +22,29 @@ import type {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null };
+type AdminWorkspaceInclude = Partial<Record<keyof Omit<AdminWorkspace, "identity">, boolean>>;
+
+const ALL_ADMIN_WORKSPACE_SECTIONS: Required<AdminWorkspaceInclude> = {
+  profiles: true,
+  accessRoles: true,
+  adminSecurityRequests: true,
+  clients: true,
+  inquiries: true,
+  projects: true,
+  projectServices: true,
+  projectMembers: true,
+  contributors: true,
+  tasks: true,
+  documents: true,
+  services: true,
+  reviews: true,
+  activity: true,
+  contentPlannerItems: true,
+  settings: true,
+};
+
+const emptyList = Promise.resolve({ data: [], error: null });
+const emptySingle = Promise.resolve({ data: null, error: null });
 
 function rows<T>(result: QueryResult<T[]>, label: string): T[] {
   if (result.error) throw new Error(`Unable to load ${label}: ${result.error.message}`);
@@ -33,38 +56,62 @@ function row<T>(result: QueryResult<T>, label: string): T | null {
   return result.data;
 }
 
-export async function getAdminWorkspace(): Promise<AdminWorkspace> {
+export async function getAdminWorkspace(include?: AdminWorkspaceInclude): Promise<AdminWorkspace> {
   const identity = await requireAdmin();
   const supabase = await createSupabaseServerClient();
 
+  const sections = include ? { ...emptyAdminWorkspaceSections(), ...include } : ALL_ADMIN_WORKSPACE_SECTIONS;
   const adminOnly = identity.role === "ADMIN";
+  const needsProjectServices = sections.projectServices || sections.projects;
   const [profilesResult, accessRolesResult, securityRequestsResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, settingsResult] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, role, access_role_id, job_title, is_active").order("full_name"),
-    adminOnly
+    sections.profiles
+      ? supabase.from("profiles").select("id, full_name, email, role, access_role_id, job_title, is_active").order("full_name")
+      : emptyList,
+    adminOnly && sections.accessRoles
       ? supabase.from("access_roles").select("id, name, description, permissions, is_system, created_at").order("name")
-      : Promise.resolve({ data: [], error: null }),
-    adminOnly
+      : emptyList,
+    adminOnly && sections.adminSecurityRequests
       ? supabase.from("admin_security_requests").select("id, request_token, action, target_profile_id, requested_by, requested_role, status, expires_at, created_at").eq("status", "PENDING").order("created_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    supabase.from("clients").select("id, company_name, contact_name, email, phone, notes, created_at").order("created_at", { ascending: false }),
-    supabase.from("inquiries").select("id, name, email, services, description, status, internal_notes, client_id, project_id, created_at").order("created_at", { ascending: false }),
-    supabase.from("projects").select("id, slug, service_id, client_id, inquiry_id, name, description, status, progress, start_date, due_date, completed_at, category, project_type, lead_outcome, lost_reason, is_published, is_featured, image_url, image_public_id, project_url, technologies, project_date, asset_size, source_image_path, sort_order, created_at").order("created_at", { ascending: false }),
-    supabase.from("project_services").select("project_id, service_id, services(title)").order("project_id"),
-    supabase.from("project_members").select("project_id, profile_id"),
-    supabase.from("project_contributors").select("id, project_id, profile_id, external_name, external_email, contribution_role"),
-    supabase.from("tasks").select("id, project_id, title, description, status, assignee_id, due_date, created_at").order("due_date", { ascending: true, nullsFirst: false }),
-    supabase.from("project_documents").select("id, project_id, file_name, storage_path, mime_type, byte_size, uploaded_by, created_at").order("created_at", { ascending: false }),
-    adminOnly
+      : emptyList,
+    sections.clients
+      ? supabase.from("clients").select("id, company_name, contact_name, email, phone, notes, created_at").order("created_at", { ascending: false })
+      : emptyList,
+    sections.inquiries
+      ? supabase.from("inquiries").select("id, name, email, services, description, status, internal_notes, client_id, project_id, created_at").order("created_at", { ascending: false })
+      : emptyList,
+    sections.projects
+      ? supabase.from("projects").select("id, slug, service_id, client_id, inquiry_id, name, description, status, progress, start_date, due_date, completed_at, category, project_type, lead_outcome, lost_reason, is_published, is_featured, image_url, image_public_id, project_url, technologies, project_date, asset_size, source_image_path, sort_order, created_at").order("created_at", { ascending: false })
+      : emptyList,
+    needsProjectServices
+      ? supabase.from("project_services").select("project_id, service_id, services(title)").order("project_id")
+      : emptyList,
+    sections.projectMembers
+      ? supabase.from("project_members").select("project_id, profile_id")
+      : emptyList,
+    sections.contributors
+      ? supabase.from("project_contributors").select("id, project_id, profile_id, external_name, external_email, contribution_role")
+      : emptyList,
+    sections.tasks
+      ? supabase.from("tasks").select("id, project_id, title, description, status, assignee_id, due_date, created_at").order("due_date", { ascending: true, nullsFirst: false })
+      : emptyList,
+    sections.documents
+      ? supabase.from("project_documents").select("id, project_id, file_name, storage_path, mime_type, byte_size, uploaded_by, created_at").order("created_at", { ascending: false })
+      : emptyList,
+    sections.services
       ? supabase.from("services").select("id, slug, title, description, icon_name, sort_order, is_published").order("sort_order")
-      : Promise.resolve({ data: [], error: null }),
-    adminOnly
+      : emptyList,
+    adminOnly && sections.reviews
       ? supabase.from("customer_reviews").select("id, request_token, client_id, project_id, recipient_email, recipient_name, customer_name, customer_email, rating, testimonial, status, submitted_at, created_at").order("created_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    supabase.from("activity_logs").select("id, actor_id, entity_type, entity_id, action, details, created_at").order("created_at", { ascending: false }).limit(80),
-    supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_for", { ascending: true }),
-    adminOnly
+      : emptyList,
+    sections.activity
+      ? supabase.from("activity_logs").select("id, actor_id, entity_type, entity_id, action, details, created_at").order("created_at", { ascending: false }).limit(80)
+      : emptyList,
+    sections.contentPlannerItems
+      ? supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_for", { ascending: true })
+      : emptyList,
+    adminOnly && sections.settings
       ? supabase.from("company_settings").select("company_name, company_email, location, logo_url, favicon_url, social_links").eq("id", true).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+      : emptySingle,
   ]);
 
   const projectServices = rows(projectServicesResult as QueryResult<(ProjectServiceRecord & { services?: { title?: string } | { title?: string }[] | null })[]>, "project service categories");
@@ -122,6 +169,27 @@ export async function getAdminWorkspace(): Promise<AdminWorkspace> {
       automation_metadata: item.automation_metadata && typeof item.automation_metadata === "object" && !Array.isArray(item.automation_metadata) ? item.automation_metadata : {},
     })),
     settings: row(settingsResult as QueryResult<CompanySettingsRecord>, "company settings"),
+  };
+}
+
+function emptyAdminWorkspaceSections(): Required<AdminWorkspaceInclude> {
+  return {
+    profiles: false,
+    accessRoles: false,
+    adminSecurityRequests: false,
+    clients: false,
+    inquiries: false,
+    projects: false,
+    projectServices: false,
+    projectMembers: false,
+    contributors: false,
+    tasks: false,
+    documents: false,
+    services: false,
+    reviews: false,
+    activity: false,
+    contentPlannerItems: false,
+    settings: false,
   };
 }
 

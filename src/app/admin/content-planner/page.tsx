@@ -4,7 +4,12 @@ import { requireModuleAccess } from "@/lib/crm/auth";
 
 export default async function ContentPlannerPage() {
   await requireModuleAccess("content-planner");
-  const workspace = await getAdminWorkspace();
+  const workspace = await getAdminWorkspace({
+    contentPlannerItems: true,
+    profiles: true,
+    projects: true,
+    services: true,
+  });
   return (
     <ContentPlanner
       items={workspace.contentPlannerItems}
