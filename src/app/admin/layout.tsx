@@ -62,7 +62,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground">
-      <AdminSidebar role={identity.role} />
+      <AdminSidebar role={identity.role} permissions={identity.permissions} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:pl-72">
         <AdminHeader

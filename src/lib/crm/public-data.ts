@@ -6,7 +6,7 @@ import { hasSupabaseConfig, getSupabaseConfig } from "@/lib/supabase/config";
 import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
 
 export type PublicService = { slug: string; title: string; description: string; icon_name: string };
-export type PublicProject = { slug: string; category: string; title: string; summary: string; image_url: string | null; project_url: string | null; technologies: string[]; project_date: string | null; project_type: string };
+export type PublicProject = { slug: string; category: string; service_slugs: string[]; service_titles: string[]; title: string; summary: string; image_url: string | null; project_url: string | null; technologies: string[]; project_date: string | null; project_type: string };
 export type PublicReview = { customer_name: string; rating: number; testimonial: string; project_name: string | null };
 export type PublicCompanySettings = {
   company_name: string;
@@ -28,9 +28,9 @@ const fallbackServices: PublicService[] = [
 ];
 
 const fallbackProjects: PublicProject[] = [
-  { slug: "brand-campaign-system", category: "Social Media", title: "Brand Campaign System", summary: "Strategy, content design, and visual direction for online growth.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
-  { slug: "tech-brand-rebrand", category: "Identity", title: "Tech Brand Rebrand", summary: "Logo design, brand direction, and complete visual identity.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
-  { slug: "business-website-platform", category: "Web Development", title: "Business Website Platform", summary: "Modern website design with responsive and conversion-focused UI.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
+  { slug: "brand-campaign-system", category: "Social Media", service_slugs: ["social-media"], service_titles: ["Social Media"], title: "Brand Campaign System", summary: "Strategy, content design, and visual direction for online growth.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
+  { slug: "tech-brand-rebrand", category: "Branding & Logo", service_slugs: ["branding-logo"], service_titles: ["Branding & Logo"], title: "Tech Brand Rebrand", summary: "Logo design, brand direction, and complete visual identity.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
+  { slug: "business-website-platform", category: "Web & Custom Systems", service_slugs: ["web-custom-systems"], service_titles: ["Web & Custom Systems"], title: "Business Website Platform", summary: "Modern website design with responsive and conversion-focused UI.", image_url: null, project_url: null, technologies: [], project_date: null, project_type: "CLIENT" },
 ];
 
 const fallbackSiteData = { settings: DEFAULT_COMPANY_SETTINGS, services: fallbackServices, projects: fallbackProjects, reviews: [] as PublicReview[], stats: { projects: fallbackProjects.length, active: 0, won: 0, inquiries: 0 } };
@@ -45,7 +45,7 @@ export async function getPublicSiteData() {
     const [settingsResult, servicesResult, projectsResult, reviewsResult, projectCountResult, activeCountResult, wonCountResult, inquiriesCountResult] = await Promise.all([
       supabase.from("company_settings").select("company_name, company_email, location, logo_url, favicon_url, social_links").eq("id", true).maybeSingle(),
       supabase.from("services").select("slug, title, description, icon_name").eq("is_published", true).order("sort_order"),
-      supabase.from("projects").select("slug, category, name, description, image_url, project_url, technologies, project_date, project_type").eq("is_published", true).order("sort_order"),
+      supabase.from("projects").select("slug, category, name, description, image_url, project_url, technologies, project_date, project_type, primary_service:services!projects_service_id_fkey(slug, title), project_services(services!project_services_service_id_fkey(slug, title))").eq("is_published", true).order("sort_order"),
       supabase.from("customer_reviews").select("customer_name, rating, testimonial, projects(name)").eq("status", "APPROVED").order("published_at", { ascending: false }),
       supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_published", true),
       supabase.from("projects").select("id", { count: "exact", head: true }).in("status", ["ACTIVE", "REVIEW"]),
@@ -77,17 +77,29 @@ export async function getPublicSiteData() {
         social_links: (setting.social_links ?? {}) as Record<string, string>,
       } : DEFAULT_COMPANY_SETTINGS,
       services: servicesResult.data?.length ? servicesResult.data as PublicService[] : fallbackServices,
-      projects: projectsResult.data?.length ? projectsResult.data.map((project) => ({
-        slug: project.slug ?? project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-        category: project.category ?? project.project_type,
-        title: project.name,
-        summary: project.description ?? "A Creatiq project.",
-        image_url: project.image_url,
-        project_url: project.project_url,
-        technologies: Array.isArray(project.technologies) ? project.technologies : [],
-        project_date: project.project_date,
-        project_type: project.project_type,
-      })) as PublicProject[] : fallbackProjects,
+      projects: projectsResult.data?.length ? projectsResult.data.map((project) => {
+        const directServices = normalizeServices(project.primary_service);
+        const linkedServices = Array.isArray(project.project_services)
+          ? project.project_services.flatMap((link) => normalizeServices(link.services))
+          : [];
+        const services = linkedServices.length ? linkedServices : directServices;
+        const serviceTitles = unique(services.map((service) => service.title).filter(Boolean));
+        const serviceSlugs = unique(services.map((service) => service.slug).filter(Boolean));
+
+        return {
+          slug: project.slug ?? project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+          category: serviceTitles[0] ?? project.category ?? project.project_type,
+          service_slugs: serviceSlugs,
+          service_titles: serviceTitles,
+          title: project.name,
+          summary: project.description ?? "A Creatiq project.",
+          image_url: project.image_url,
+          project_url: project.project_url,
+          technologies: Array.isArray(project.technologies) ? project.technologies : [],
+          project_date: project.project_date,
+          project_type: project.project_type,
+        };
+      }) as PublicProject[] : fallbackProjects,
       reviews: reviewsResult.data?.flatMap((review) => review.customer_name && review.rating && review.testimonial ? [{ customer_name: review.customer_name, rating: review.rating, testimonial: review.testimonial, project_name: Array.isArray(review.projects) ? review.projects[0]?.name ?? null : (review.projects as { name?: string } | null)?.name ?? null }] : []) as PublicReview[] ?? [],
       stats: { projects: projectCountResult.count ?? 0, active: activeCountResult.count ?? 0, won: wonCountResult.count ?? 0, inquiries: inquiriesCountResult.count ?? 0 },
     };
@@ -96,4 +108,20 @@ export async function getPublicSiteData() {
     console.warn("Public CMS is temporarily unavailable; using local fallback content.");
     return fallbackSiteData;
   }
+}
+
+function normalizeServices(value: unknown) {
+  const services = Array.isArray(value) ? value : value ? [value] : [];
+  return services.flatMap((service) => {
+    if (!service || typeof service !== "object") return [];
+    const item = service as { slug?: unknown; title?: unknown };
+    return [{
+      slug: typeof item.slug === "string" ? item.slug : "",
+      title: typeof item.title === "string" ? item.title : "",
+    }];
+  });
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
 }

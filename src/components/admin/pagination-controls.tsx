@@ -24,10 +24,12 @@ export function PaginationControls({
   page,
   pageSize,
   total,
+  extraParams = {},
 }: {
   page: number;
   pageSize: PageSize;
   total: number;
+  extraParams?: Record<string, string | number | undefined>;
 }) {
   const isAll = pageSize === "all";
   const numericSize = isAll ? total || 1 : pageSize;
@@ -55,7 +57,7 @@ export function PaginationControls({
             return (
               <Link
                 key={size}
-                href={hrefWith({ limit: size, page: 1 })}
+                href={hrefWith({ ...extraParams, limit: size, page: 1 })}
                 className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${
                   active
                     ? "bg-cyan-300/15 text-secondary"
@@ -73,6 +75,7 @@ export function PaginationControls({
             <Link
               aria-disabled={safePage <= 1}
               href={hrefWith({
+                ...extraParams,
                 limit: pageSize,
                 page: Math.max(1, safePage - 1),
               })}
@@ -93,6 +96,7 @@ export function PaginationControls({
             <Link
               aria-disabled={safePage >= totalPages}
               href={hrefWith({
+                ...extraParams,
                 limit: pageSize,
                 page: Math.min(totalPages, safePage + 1),
               })}

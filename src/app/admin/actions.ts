@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/crm/auth";
-import { INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
+import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
+import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -34,6 +34,15 @@ function optionalText(values: Record<string, unknown>, key: string, max = 5_000)
 function optionalUuid(values: Record<string, unknown>, key: string) {
   const value = String(values[key] ?? "").trim();
   return value ? z.uuid().parse(value) : null;
+}
+
+function uuidArray(values: Record<string, unknown>, key: string) {
+  const value = values[key];
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((item): item is string =>
+    typeof item === "string" && z.uuid().safeParse(item).success,
+  );
 }
 
 function integer(values: Record<string, unknown>, key: string, min = 0, max = 1_000_000) {
@@ -87,6 +96,69 @@ function ownerOnly(role: string) {
 function authPasswordSetupUrl() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.FRONTEND_URL;
   return appUrl ? new URL("/auth/set-password", appUrl).toString() : undefined;
+}
+
+function allowedPermissions(values: unknown) {
+  const allowed = new Set(ADMIN_MODULES.map((module) => module.key));
+  return Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === "string" && allowed.has(value as never))
+    : [];
+}
+
+const contentMediaAssetSchema = z.object({
+  id: z.string().min(1).max(120),
+  url: z.url().max(2_000),
+  publicId: z.string().max(300).nullable(),
+  provider: z.enum(["cloudinary", "external"]).default("cloudinary"),
+  mimeType: z.string().max(120).nullable(),
+  fileName: z.string().max(220).nullable(),
+  alt: z.string().max(180).nullable(),
+});
+
+function contentMediaAssets(values: Record<string, unknown>) {
+  const assets = values.media_assets;
+  if (!Array.isArray(assets)) return [];
+  return assets
+    .map((asset) => contentMediaAssetSchema.safeParse(asset))
+    .filter((result): result is z.ZodSafeParseSuccess<z.infer<typeof contentMediaAssetSchema>> => result.success)
+    .map((result) => result.data)
+    .slice(0, 10);
+}
+
+async function sendAccountNotice({
+  to,
+  name,
+  subject,
+  message,
+}: {
+  to: string;
+  name: string;
+  subject: string;
+  message: string;
+}) {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  if (!smtpHost || !smtpUser || !smtpPass) return;
+
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: Number(process.env.SMTP_PORT ?? 465),
+      secure: process.env.SMTP_SECURE !== "false",
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+    await transporter.sendMail({
+      from: `"Creatiq CRM" <${smtpUser}>`,
+      to,
+      subject,
+      text: `Hi ${name},\n\n${message}\n\nIf you believe this was a mistake, please contact a Creatiq Admin.`,
+      html: `<div style="font-family:Inter,Arial,sans-serif;background:#020b1f;padding:28px;color:#e8f1ff"><div style="max-width:560px;margin:auto;border:1px solid rgba(8,189,255,.25);border-radius:22px;background:#061329;padding:26px"><p style="margin:0 0 12px;color:#08bdff;font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800">Creatiq CRM Access Notice</p><h1 style="margin:0 0 14px;color:#ffffff;font-size:26px">Account access updated</h1><p style="margin:0 0 14px;line-height:1.7;color:#c8d4ec">Hi ${name},</p><p style="margin:0;line-height:1.7;color:#c8d4ec">${message}</p><div style="margin-top:22px;padding:14px;border-radius:14px;background:rgba(8,189,255,.08);color:#9ee8ff;font-size:13px">If you believe this was a mistake, please contact a Creatiq Admin.</div></div></div>`,
+    });
+  } catch (error) {
+    console.error("Unable to send account notice:", error);
+  }
 }
 
 export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
@@ -154,10 +226,12 @@ export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
         return { ok: true, message: "Project progress updated." };
       }
 
+      const serviceIds = uuidArray(values, "service_ids");
       const payload = {
         slug: optionalText(values, "slug", 100)?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || null,
         name: requiredText(values, "name", 200),
         description: optionalText(values, "description"),
+        service_id: serviceIds[0] ?? optionalUuid(values, "service_id"),
         client_id: optionalUuid(values, "client_id"),
         category: optionalText(values, "category", 120),
         project_type: z.enum(PROJECT_TYPES).parse(values.project_type ?? "CLIENT"),
@@ -188,6 +262,17 @@ export async function saveCrmRecord(input: CrmMutation): Promise<ActionResult> {
         : await supabase.from("projects").insert(payload).select("id").single();
 
       if (!result.error && result.data) {
+        await supabase.from("project_services").delete().eq("project_id", result.data.id);
+        if (serviceIds.length) {
+          const { error } = await supabase.from("project_services").insert(
+            serviceIds.map((serviceId) => ({
+              project_id: result!.data!.id,
+              service_id: serviceId,
+            })),
+          );
+          if (error) throw new Error(error.message);
+        }
+
         const memberIds = Array.isArray(values.member_ids) ? values.member_ids.filter((value): value is string => typeof value === "string" && z.uuid().safeParse(value).success) : [];
         await supabase.from("project_members").delete().eq("project_id", result.data.id);
         await supabase.from("project_contributors").delete().eq("project_id", result.data.id).not("profile_id", "is", null);
@@ -424,9 +509,23 @@ export async function setUserRole(profileId: string, role: "ADMIN" | "STAFF"): P
     ownerOnly(identity.role);
     if (profileId === identity.id) throw new Error("You cannot change your own Admin role. Another Admin can do that.");
     const supabase = await createSupabaseServerClient();
+    const { data: targetProfile, error: targetProfileError } = await supabase
+      .from("profiles")
+      .select("role, full_name, email")
+      .eq("id", profileId)
+      .single();
+    if (targetProfileError || !targetProfile) throw new Error(targetProfileError?.message ?? "User profile not found.");
     const { error } = await supabase.from("profiles").update({ role }).eq("id", profileId);
     if (error) throw new Error(error.message);
     await logActivity("profile", profileId, "role_updated", { role });
+    if (targetProfile.role === "ADMIN" || role === "ADMIN") {
+      await sendAccountNotice({
+        to: targetProfile.email,
+        name: targetProfile.full_name,
+        subject: "Creatiq CRM role updated",
+        message: `Your Creatiq CRM access role was changed from ${targetProfile.role} to ${role}.`,
+      });
+    }
     refreshCrm();
     return { ok: true, message: "User role updated." };
   } catch (error) {
@@ -458,10 +557,123 @@ export async function setUserActive(profileId: string, isActive: boolean, confir
       email: targetProfile.email,
       role: targetProfile.role,
     });
+    if (targetProfile.role === "ADMIN") {
+      await sendAccountNotice({
+        to: targetProfile.email,
+        name: targetProfile.full_name,
+        subject: `Creatiq CRM account ${isActive ? "activated" : "deactivated"}`,
+        message: `Your Creatiq CRM admin account has been ${isActive ? "activated" : "deactivated"}. ${isActive ? "You can sign in again using your existing credentials." : "You will not be able to sign in until another Admin reactivates your account."}`,
+      });
+    }
     refreshCrm();
     return { ok: true, message: `${targetProfile.full_name} is now ${isActive ? "active" : "inactive"}.` };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to update account access." };
+  }
+}
+
+export async function setUserAccessRole(profileId: string, accessRoleId: string | null): Promise<ActionResult> {
+  try {
+    z.uuid().parse(profileId);
+    const identity = await requireAdmin(["ADMIN"]);
+    if (profileId === identity.id) throw new Error("You cannot change your own access configuration.");
+    const supabase = await createSupabaseServerClient();
+    const nextRoleId = accessRoleId ? z.uuid().parse(accessRoleId) : null;
+    const { error } = await supabase.from("profiles").update({ access_role_id: nextRoleId }).eq("id", profileId);
+    if (error) throw new Error(error.message);
+    await logActivity("profile", profileId, "access_role_updated", { accessRoleId: nextRoleId });
+    refreshCrm();
+    return { ok: true, message: "User access role updated." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update access role." };
+  }
+}
+
+export async function saveAccessRole(values: { id?: string; name: string; description?: string; permissions: string[] }): Promise<ActionResult> {
+  try {
+    const identity = await requireAdmin(["ADMIN"]);
+    const payload = {
+      name: z.string().trim().min(2).max(120).parse(values.name),
+      description: values.description?.trim().slice(0, 700) || null,
+      permissions: allowedPermissions(values.permissions),
+      created_by: identity.id,
+    };
+    const supabase = await createSupabaseServerClient();
+    const id = values.id ? z.uuid().parse(values.id) : null;
+    const result = id
+      ? await supabase.from("access_roles").update({ name: payload.name, description: payload.description, permissions: payload.permissions }).eq("id", id).select("id").single()
+      : await supabase.from("access_roles").insert(payload).select("id").single();
+    if (result.error || !result.data) throw new Error(result.error?.message ?? "Unable to save access role.");
+    await logActivity("access_role", result.data.id, id ? "updated" : "created", { name: payload.name });
+    refreshCrm();
+    return { ok: true, message: `Access role ${id ? "updated" : "created"}.` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to save access role." };
+  }
+}
+
+export async function deleteAccessRole(id: string): Promise<ActionResult> {
+  try {
+    z.uuid().parse(id);
+    await requireAdmin(["ADMIN"]);
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("access_roles").delete().eq("id", id).eq("is_system", false);
+    if (error) throw new Error(error.message);
+    await logActivity("access_role", id, "deleted");
+    refreshCrm();
+    return { ok: true, message: "Access role deleted." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to delete access role." };
+  }
+}
+
+export async function saveContentPlannerItem(values: Record<string, unknown>, id?: string): Promise<ActionResult> {
+  try {
+    const identity = await requireModuleAccess("content-planner");
+    const supabase = await createSupabaseServerClient();
+    const payload = {
+      title: requiredText(values, "title", 180),
+      channel: requiredText(values, "channel", 80),
+      content_type: requiredText(values, "content_type", 80),
+      status: z.enum(CONTENT_STATUSES).parse(values.status ?? "IDEA"),
+      planned_for: dateOrNull(values, "planned_for") ?? new Date().toISOString().slice(0, 10),
+      description: optionalText(values, "description", 2_000),
+      owner_id: optionalUuid(values, "owner_id"),
+      project_id: optionalUuid(values, "project_id"),
+      service_id: optionalUuid(values, "service_id"),
+      media_assets: contentMediaAssets(values),
+      automation_metadata: {
+        caption_format: "facebook_plain_text_v1",
+        supports_unicode_styling: true,
+        hashtags_are_native: true,
+      },
+      ...(id ? {} : { created_by: identity.id }),
+    };
+    const parsedId = id ? z.uuid().parse(id) : null;
+    const result = parsedId
+      ? await supabase.from("content_planner_items").update(payload).eq("id", parsedId).select("id").single()
+      : await supabase.from("content_planner_items").insert(payload).select("id").single();
+    if (result.error || !result.data) throw new Error(result.error?.message ?? "Unable to save content item.");
+    await logActivity("content_planner", result.data.id, parsedId ? "updated" : "created", { title: payload.title, planned_for: payload.planned_for });
+    refreshCrm();
+    return { ok: true, message: `Content item ${parsedId ? "updated" : "created"}.` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to save content item." };
+  }
+}
+
+export async function deleteContentPlannerItem(id: string): Promise<ActionResult> {
+  try {
+    z.uuid().parse(id);
+    await requireModuleAccess("content-planner", ["ADMIN"]);
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("content_planner_items").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    await logActivity("content_planner", id, "deleted");
+    refreshCrm();
+    return { ok: true, message: "Content item deleted." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to delete content item." };
   }
 }
 

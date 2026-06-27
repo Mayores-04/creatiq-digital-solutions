@@ -179,6 +179,7 @@ function ResponsiveCamera({
     const perspectiveCamera = camera as PerspectiveCamera;
 
     perspectiveCamera.position.set(0, cameraY, cameraDistance);
+    // eslint-disable-next-line react-hooks/immutability
     perspectiveCamera.fov = cameraFov;
     perspectiveCamera.updateProjectionMatrix();
 

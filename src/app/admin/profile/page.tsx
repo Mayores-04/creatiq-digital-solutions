@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
   const result = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, job_title, is_active")
+    .select("id, full_name, email, role, access_role_id, job_title, is_active")
     .eq("id", identity.id)
     .maybeSingle() as ProfileResult;
 

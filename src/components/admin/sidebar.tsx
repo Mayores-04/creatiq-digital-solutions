@@ -11,6 +11,7 @@ import {
   Bell,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   FolderKanban,
   Inbox,
   LayoutDashboard,
@@ -21,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 
-import type { AdminRole } from "@/lib/crm/constants";
+import type { AdminModuleKey, AdminRole } from "@/lib/crm/constants";
 import { brand } from "@/components/site/brand";
 
 const links = [
@@ -30,12 +31,14 @@ const links = [
     label: "Overview",
     icon: LayoutDashboard,
     group: "Workspace",
+    module: "overview",
   },
   {
     href: "/admin/inquiries",
     label: "Inquiries",
     icon: Inbox,
     group: "Workspace",
+    module: "inquiries",
   },
   {
     href: "/admin/clients",
@@ -43,24 +46,35 @@ const links = [
     icon: Building2,
     group: "Workspace",
     adminOnly: true,
+    module: "clients",
   },
   {
     href: "/admin/projects",
     label: "Projects",
     icon: FolderKanban,
     group: "Delivery",
+    module: "projects",
   },
   {
     href: "/admin/tasks",
     label: "Tasks",
     icon: BriefcaseBusiness,
     group: "Delivery",
+    module: "tasks",
   },
   {
     href: "/admin/employees",
     label: "Employees",
     icon: Users,
     group: "Delivery",
+    module: "employees",
+  },
+  {
+    href: "/admin/content-planner",
+    label: "Content Planner",
+    icon: CalendarDays,
+    group: "Growth",
+    module: "content-planner",
   },
   {
     href: "/admin/reviews",
@@ -68,6 +82,7 @@ const links = [
     icon: MessageSquareQuote,
     group: "Growth",
     adminOnly: true,
+    module: "customer-reviews",
   },
   {
     href: "/admin/services",
@@ -75,18 +90,21 @@ const links = [
     icon: Activity,
     group: "Growth",
     adminOnly: true,
+    module: "services",
   },
   {
     href: "/admin/reports",
     label: "Reports",
     icon: BarChart3,
     group: "Growth",
+    module: "reports",
   },
   {
     href: "/admin/notifications",
     label: "Activity Center",
     icon: Bell,
     group: "System",
+    module: "notifications",
   },
   {
     href: "/admin/settings",
@@ -94,6 +112,7 @@ const links = [
     icon: Settings,
     group: "System",
     adminOnly: true,
+    module: "settings",
   },
   {
     href: "/admin/users",
@@ -101,6 +120,7 @@ const links = [
     icon: UserRoundCog,
     group: "System",
     adminOnly: true,
+    module: "users",
   },
 ];
 
@@ -108,17 +128,13 @@ const groups = ["Workspace", "Delivery", "Growth", "System"] as const;
 
 type SidebarLink = (typeof links)[number];
 
-export function AdminSidebar({ role }: { role: AdminRole }) {
+export function AdminSidebar({ role, permissions }: { role: AdminRole; permissions: AdminModuleKey[] }) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const visibleLinks = useMemo(() => {
-    return links.filter((link) => !link.adminOnly || role === "ADMIN");
-  }, [role]);
-
-  useEffect(() => {
-    setIsMobileOpen(false);
-  }, [pathname]);
+    return links.filter((link) => (!link.adminOnly || role === "ADMIN") && (role === "ADMIN" || permissions.includes(link.module as AdminModuleKey)));
+  }, [permissions, role]);
 
   useEffect(() => {
     function openSidebar() {

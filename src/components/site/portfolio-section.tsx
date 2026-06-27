@@ -60,6 +60,7 @@ type ServiceFilter = {
   shortLabel: string;
   description: string;
   icon: LucideIcon;
+  slugs: string[];
   keywords: string[];
   layout: LayoutVariant;
 };
@@ -71,6 +72,7 @@ const serviceFilters: ServiceFilter[] = [
     shortLabel: "All",
     description: "Browse every featured work across Creatiq services.",
     icon: Sparkles,
+    slugs: [],
     keywords: [],
     layout: "carousel",
   },
@@ -80,6 +82,7 @@ const serviceFilters: ServiceFilter[] = [
     shortLabel: "Graphics",
     description: "Posters, layouts, print designs, and visual creatives.",
     icon: Paintbrush,
+    slugs: ["graphic-design"],
     keywords: [
       "graphic",
       "graphics",
@@ -101,6 +104,7 @@ const serviceFilters: ServiceFilter[] = [
     description:
       "Websites, dashboards, booking apps, CRM, and internal systems.",
     icon: Code2,
+    slugs: ["web-custom-systems", "web-systems", "web-development"],
     keywords: [
       "web",
       "website",
@@ -127,6 +131,7 @@ const serviceFilters: ServiceFilter[] = [
     description:
       "Campaign visuals, content systems, and social media creatives.",
     icon: Share2,
+    slugs: ["social-media"],
     keywords: [
       "social",
       "facebook",
@@ -146,6 +151,7 @@ const serviceFilters: ServiceFilter[] = [
     shortLabel: "Branding",
     description: "Logo, identity systems, brand refresh, and visual direction.",
     icon: BadgeCheck,
+    slugs: ["branding-logo", "branding"],
     keywords: [
       "brand",
       "branding",
@@ -163,6 +169,7 @@ const serviceFilters: ServiceFilter[] = [
     shortLabel: "Mobile",
     description: "Mobile applications and app-based digital experiences.",
     icon: Smartphone,
+    slugs: ["mobile-app"],
     keywords: [
       "mobile",
       "app",
@@ -182,6 +189,7 @@ const serviceFilters: ServiceFilter[] = [
     description:
       "Interfaces, prototypes, wireframes, and user experience work.",
     icon: PenTool,
+    slugs: ["ui-ux-design", "ui-ux"],
     keywords: [
       "ui",
       "ux",
@@ -201,6 +209,7 @@ const serviceFilters: ServiceFilter[] = [
     shortLabel: "Video",
     description: "Video edits, motion graphics, reels, and marketing visuals.",
     icon: Clapperboard,
+    slugs: ["video-editing"],
     keywords: [
       "video",
       "editing",
@@ -635,12 +644,14 @@ function CarouselLayout({ projects }: { projects: PublicProject[] }) {
     if (!emblaApi) return;
     emblaApi.reInit();
     emblaApi.scrollTo(startIndex, true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedVirtualIndex(startIndex);
     setSelectedRealIndex(0);
   }, [emblaApi, startIndex, totalProjects]);
 
   useEffect(() => {
     if (!emblaApi || !totalProjects) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateSelected();
     emblaApi.on("select", updateSelected);
     emblaApi.on("reInit", updateSelected);
@@ -784,7 +795,7 @@ function MasonryCard({
         {/* hover overlay */}
         <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:p-4">
           <span className="mb-1.5 inline-block w-fit rounded-full border border-cyan-300/25 bg-cyan-300/15 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-secondary">
-            {project.category}
+            {projectServiceLabel(project)}
           </span>
           <h3 className="line-clamp-2 text-sm font-black leading-tight text-white sm:text-base">
             {project.title}
@@ -852,7 +863,7 @@ function SocialLayout({ projects }: { projects: PublicProject[] }) {
             </div>
             <div className="p-5">
               <span className="inline-block rounded-full border border-cyan-300/25 bg-cyan-300/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-secondary">
-                {lightbox.category}
+                {projectServiceLabel(lightbox)}
               </span>
               <h3 className="mt-2 text-xl font-black text-primary">
                 {lightbox.title}
@@ -919,7 +930,7 @@ function SocialCard({
       {/* hover overlay */}
       <div className="absolute inset-0 flex flex-col items-start justify-end bg-gradient-to-t from-black/85 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <span className="mb-1 inline-block rounded-full border border-cyan-300/30 bg-cyan-300/20 px-2 py-0.5 text-[7px] font-bold uppercase tracking-widest text-secondary">
-          {project.category}
+          {projectServiceLabel(project)}
         </span>
         <p className="line-clamp-2 text-left text-xs font-black leading-tight text-white">
           {project.title}
@@ -1034,7 +1045,7 @@ function VideoCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="inline-block rounded-full border border-cyan-300/25 bg-cyan-300/15 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-secondary">
-              {project.category}
+              {projectServiceLabel(project)}
             </span>
             <h3 className="mt-2 line-clamp-1 text-base font-black text-primary sm:text-lg">
               {project.title}
@@ -1125,7 +1136,7 @@ function ProjectSlide({
             <div className="w-full max-w-2xl translate-y-0 sm:translate-y-4 sm:transition sm:duration-500 sm:group-hover:translate-y-0">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-cyan-300/25 bg-cyan-300/15 px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest text-secondary backdrop-blur-md sm:text-[9px]">
-                  {project.category}
+                  {projectServiceLabel(project)}
                 </span>
                 <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[8px] font-bold uppercase tracking-widest text-white/85 backdrop-blur-md sm:text-[9px]">
                   {formatProjectType(project.project_type)}
@@ -1236,6 +1247,17 @@ function ProjectFallback({ projectIndex }: { projectIndex: number }) {
 
 function matchesServiceFilter(project: PublicProject, filter: ServiceFilter) {
   if (filter.key === "all") return true;
+  if (project.service_slugs?.some((slug) => filter.slugs.includes(slug))) {
+    return true;
+  }
+  if (project.service_titles?.some((title) => filter.label.toLowerCase() === title.toLowerCase())) {
+    return true;
+  }
+
+  if (project.service_slugs?.length || project.service_titles?.length) {
+    return false;
+  }
+
   const text = [
     project.category,
     project.project_type,
@@ -1247,6 +1269,12 @@ function matchesServiceFilter(project: PublicProject, filter: ServiceFilter) {
     .join(" ")
     .toLowerCase();
   return filter.keywords.some((kw) => text.includes(kw));
+}
+
+function projectServiceLabel(project: PublicProject) {
+  return project.service_titles?.length
+    ? project.service_titles.join(" + ")
+    : project.category;
 }
 
 function formatProjectType(value: string | null | undefined) {

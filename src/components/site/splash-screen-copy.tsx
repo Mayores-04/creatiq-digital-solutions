@@ -197,6 +197,7 @@ export function SplashScreen() {
   const previousScrollRestorationRef = useRef<ScrollRestoration | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDeviceInfo(getDeviceInfo());
 
     previousOverflowRef.current = document.body.style.overflow;

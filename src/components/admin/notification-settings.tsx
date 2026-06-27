@@ -51,10 +51,12 @@ export function NotificationSettings() {
 
       const parsed = JSON.parse(saved) as Partial<Record<SettingKey, boolean>>;
 
-      setSettings((current) => ({
-        ...current,
-        ...parsed,
-      }));
+      window.setTimeout(() => {
+        setSettings((current) => ({
+          ...current,
+          ...parsed,
+        }));
+      }, 0);
     } catch {
       window.localStorage.removeItem(storageKey);
     }

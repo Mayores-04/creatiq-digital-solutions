@@ -3,6 +3,7 @@ import "server-only";
 import { requireAdmin } from "./auth";
 import type {
   ActivityRecord,
+  AccessRoleRecord,
   AdminWorkspace,
   ClientRecord,
   CompanySettingsRecord,
@@ -11,7 +12,9 @@ import type {
   ProjectRecord,
   ProjectDocumentRecord,
   ProjectContributorRecord,
+  ProjectServiceRecord,
   CustomerReviewRecord,
+  ContentPlannerItemRecord,
   ServiceRecord,
   TaskRecord,
 } from "./types";
@@ -34,11 +37,15 @@ export async function getAdminWorkspace(): Promise<AdminWorkspace> {
   const supabase = await createSupabaseServerClient();
 
   const adminOnly = identity.role === "ADMIN";
-  const [profilesResult, clientsResult, inquiriesResult, projectsResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, settingsResult] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, role, job_title, is_active").order("full_name"),
+  const [profilesResult, accessRolesResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, settingsResult] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, email, role, access_role_id, job_title, is_active").order("full_name"),
+    adminOnly
+      ? supabase.from("access_roles").select("id, name, description, permissions, is_system, created_at").order("name")
+      : Promise.resolve({ data: [], error: null }),
     supabase.from("clients").select("id, company_name, contact_name, email, phone, notes, created_at").order("created_at", { ascending: false }),
     supabase.from("inquiries").select("id, name, email, services, description, status, internal_notes, client_id, project_id, created_at").order("created_at", { ascending: false }),
-    supabase.from("projects").select("id, slug, client_id, inquiry_id, name, description, status, progress, start_date, due_date, completed_at, category, project_type, lead_outcome, lost_reason, is_published, is_featured, image_url, image_public_id, project_url, technologies, project_date, asset_size, source_image_path, sort_order, created_at").order("created_at", { ascending: false }),
+    supabase.from("projects").select("id, slug, service_id, client_id, inquiry_id, name, description, status, progress, start_date, due_date, completed_at, category, project_type, lead_outcome, lost_reason, is_published, is_featured, image_url, image_public_id, project_url, technologies, project_date, asset_size, source_image_path, sort_order, created_at").order("created_at", { ascending: false }),
+    supabase.from("project_services").select("project_id, service_id, services(title)").order("project_id"),
     supabase.from("project_members").select("project_id, profile_id"),
     supabase.from("project_contributors").select("id, project_id, profile_id, external_name, external_email, contribution_role"),
     supabase.from("tasks").select("id, project_id, title, description, status, assignee_id, due_date, created_at").order("due_date", { ascending: true, nullsFirst: false }),
@@ -50,30 +57,65 @@ export async function getAdminWorkspace(): Promise<AdminWorkspace> {
       ? supabase.from("customer_reviews").select("id, request_token, client_id, project_id, recipient_email, recipient_name, customer_name, customer_email, rating, testimonial, status, submitted_at, created_at").order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     supabase.from("activity_logs").select("id, actor_id, entity_type, entity_id, action, details, created_at").order("created_at", { ascending: false }).limit(80),
+    supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_for", { ascending: true }),
     adminOnly
       ? supabase.from("company_settings").select("company_name, company_email, location, logo_url, favicon_url, social_links").eq("id", true).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
 
+  const projectServices = rows(projectServicesResult as QueryResult<(ProjectServiceRecord & { services?: { title?: string } | { title?: string }[] | null })[]>, "project service categories");
+  const serviceIdsByProject = new Map<string, string[]>();
+  const serviceTitlesByProject = new Map<string, string[]>();
+
+  for (const link of projectServices) {
+    const titles = Array.isArray(link.services) ? link.services : link.services ? [link.services] : [];
+    serviceIdsByProject.set(link.project_id, [...(serviceIdsByProject.get(link.project_id) ?? []), link.service_id]);
+    serviceTitlesByProject.set(link.project_id, [
+      ...(serviceTitlesByProject.get(link.project_id) ?? []),
+      ...titles.map((service) => service.title).filter((title): title is string => Boolean(title)),
+    ]);
+  }
+
+  const services = rows(servicesResult as QueryResult<ServiceRecord[]>, "services");
+  const serviceTitleById = new Map(services.map((service) => [service.id, service.title]));
+
   return {
     identity,
     profiles: rows(profilesResult as QueryResult<ProfileRecord[]>, "employees"),
+    accessRoles: rows(accessRolesResult as QueryResult<AccessRoleRecord[]>, "access roles").map((role) => ({
+      ...role,
+      permissions: Array.isArray(role.permissions) ? role.permissions.map(String) : [],
+    })),
     clients: rows(clientsResult as QueryResult<ClientRecord[]>, "clients"),
     inquiries: rows(inquiriesResult as QueryResult<InquiryRecord[]>, "inquiries").map((inquiry) => ({
       ...inquiry,
       services: Array.isArray(inquiry.services) ? inquiry.services : [],
     })),
-    projects: rows(projectsResult as QueryResult<ProjectRecord[]>, "projects").map((project) => ({
-      ...project,
-      technologies: Array.isArray(project.technologies) ? project.technologies : [],
-    })),
+    projects: rows(projectsResult as QueryResult<Omit<ProjectRecord, "service_ids" | "service_titles">[]>, "projects").map((project) => {
+      const serviceIds = serviceIdsByProject.get(project.id) ?? (project.service_id ? [project.service_id] : []);
+      const serviceTitles = serviceTitlesByProject.get(project.id) ?? serviceIds.map((serviceId) => serviceTitleById.get(serviceId)).filter((title): title is string => Boolean(title));
+
+      return {
+        ...project,
+        service_ids: serviceIds,
+        service_titles: serviceTitles,
+        technologies: Array.isArray(project.technologies) ? project.technologies : [],
+      };
+    }),
+    projectServices: projectServices.map(({ project_id, service_id }) => ({ project_id, service_id })),
     projectMembers: rows(membersResult as QueryResult<{ project_id: string; profile_id: string }[]>, "project assignments"),
     contributors: rows(contributorsResult as QueryResult<ProjectContributorRecord[]>, "project contributors"),
     tasks: rows(tasksResult as QueryResult<TaskRecord[]>, "tasks"),
     documents: rows(documentsResult as QueryResult<ProjectDocumentRecord[]>, "project documents"),
-    services: rows(servicesResult as QueryResult<ServiceRecord[]>, "services"),
+    services,
     reviews: rows(reviewsResult as QueryResult<CustomerReviewRecord[]>, "customer reviews"),
     activity: rows(activityResult as QueryResult<ActivityRecord[]>, "activity"),
+    contentPlannerItems: rows(contentPlannerResult as QueryResult<ContentPlannerItemRecord[]>, "content planner").map((item) => ({
+      ...item,
+      media_assets: Array.isArray(item.media_assets) ? item.media_assets : [],
+      platform_targets: Array.isArray(item.platform_targets) ? item.platform_targets.map(String) : [],
+      automation_metadata: item.automation_metadata && typeof item.automation_metadata === "object" && !Array.isArray(item.automation_metadata) ? item.automation_metadata : {},
+    })),
     settings: row(settingsResult as QueryResult<CompanySettingsRecord>, "company settings"),
   };
 }

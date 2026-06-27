@@ -5,5 +5,5 @@ import { getAdminWorkspace } from "@/lib/crm/admin-data";
 export default async function UsersPage() {
   await requireAdmin(["ADMIN"]);
   const workspace = await getAdminWorkspace();
-  return <UserManagement profiles={workspace.profiles} currentUserId={workspace.identity.id} />;
+  return <UserManagement profiles={workspace.profiles} currentUserId={workspace.identity.id} accessRoles={workspace.accessRoles} />;
 }

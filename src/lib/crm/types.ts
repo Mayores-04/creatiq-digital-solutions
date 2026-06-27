@@ -1,4 +1,4 @@
-import type { AdminRole } from "./constants";
+import type { AdminModuleKey, AdminRole } from "./constants";
 
 export type SelectOption = { value: string; label: string };
 
@@ -7,6 +7,7 @@ export type ProfileRecord = {
   full_name: string;
   email: string;
   role: AdminRole;
+  access_role_id: string | null;
   job_title: string | null;
   is_active: boolean;
 };
@@ -37,6 +38,9 @@ export type InquiryRecord = {
 export type ProjectRecord = {
   id: string;
   slug: string | null;
+  service_id: string | null;
+  service_ids: string[];
+  service_titles: string[];
   client_id: string | null;
   inquiry_id: string | null;
   name: string;
@@ -95,6 +99,11 @@ export type ServiceRecord = {
   is_published: boolean;
 };
 
+export type ProjectServiceRecord = {
+  project_id: string;
+  service_id: string;
+};
+
 export type ProjectContributorRecord = {
   id: string;
   project_id: string;
@@ -130,6 +139,42 @@ export type ActivityRecord = {
   created_at: string;
 };
 
+export type AccessRoleRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  is_system: boolean;
+  created_at: string;
+};
+
+export type ContentPlannerItemRecord = {
+  id: string;
+  title: string;
+  channel: string;
+  content_type: string;
+  status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED";
+  planned_for: string;
+  description: string | null;
+  owner_id: string | null;
+  project_id: string | null;
+  service_id: string | null;
+  media_assets: ContentPlannerMediaAsset[];
+  platform_targets: string[];
+  automation_metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ContentPlannerMediaAsset = {
+  id: string;
+  url: string;
+  publicId: string | null;
+  provider: "cloudinary" | "external";
+  mimeType: string | null;
+  fileName: string | null;
+  alt: string | null;
+};
+
 export type CompanySettingsRecord = {
   company_name: string;
   company_email: string;
@@ -140,11 +185,13 @@ export type CompanySettingsRecord = {
 };
 
 export type AdminWorkspace = {
-  identity: { id: string; role: AdminRole; fullName: string; email: string };
+  identity: { id: string; role: AdminRole; fullName: string; email: string; permissions: AdminModuleKey[] };
   profiles: ProfileRecord[];
+  accessRoles: AccessRoleRecord[];
   clients: ClientRecord[];
   inquiries: InquiryRecord[];
   projects: ProjectRecord[];
+  projectServices: ProjectServiceRecord[];
   projectMembers: { project_id: string; profile_id: string }[];
   contributors: ProjectContributorRecord[];
   tasks: TaskRecord[];
@@ -152,5 +199,6 @@ export type AdminWorkspace = {
   services: ServiceRecord[];
   reviews: CustomerReviewRecord[];
   activity: ActivityRecord[];
+  contentPlannerItems: ContentPlannerItemRecord[];
   settings: CompanySettingsRecord | null;
 };
