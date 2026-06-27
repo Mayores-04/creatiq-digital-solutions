@@ -41,7 +41,7 @@ const LAST_SECTION_KEY = "creatiq-last-section";
  */
 
 const PHONE_3D = {
-  modelScale: 0.32,
+  modelScale: 0.5,
   modelY: 0.03,
   cameraDistance: 10.8,
   cameraY: 0.04,

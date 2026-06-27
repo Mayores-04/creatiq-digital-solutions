@@ -128,12 +128,23 @@ const groups = ["Workspace", "Delivery", "Growth", "System"] as const;
 
 type SidebarLink = (typeof links)[number];
 
-export function AdminSidebar({ role, permissions }: { role: AdminRole; permissions: AdminModuleKey[] }) {
+export function AdminSidebar({
+  role,
+  permissions,
+}: {
+  role: AdminRole;
+  permissions: AdminModuleKey[];
+}) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const visibleLinks = useMemo(() => {
-    return links.filter((link) => (!link.adminOnly || role === "ADMIN") && (role === "ADMIN" || permissions.includes(link.module as AdminModuleKey)));
+    return links.filter(
+      (link) =>
+        (!link.adminOnly || role === "ADMIN") &&
+        (role === "ADMIN" ||
+          permissions.includes(link.module as AdminModuleKey)),
+    );
   }, [permissions, role]);
 
   useEffect(() => {
