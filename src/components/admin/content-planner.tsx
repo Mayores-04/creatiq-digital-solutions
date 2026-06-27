@@ -1,10 +1,10 @@
 "use client";
 
 import { type FormEvent, type RefObject, useMemo, useRef, useState } from "react";
-import { Bold, CalendarDays, Hash, ImageIcon, Italic, List, ListOrdered, MessageSquareText, Pencil, Plus, Quote, Save, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Bold, CalendarDays, Hash, ImageIcon, Italic, List, ListOrdered, MessageSquareText, Pencil, Plus, Quote, Save, Send, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { deleteContentPlannerItem, saveContentPlannerItem } from "@/app/admin/actions";
+import { deleteContentPlannerItem, publishContentPlannerItemToFacebook, saveContentPlannerItem } from "@/app/admin/actions";
 import { CONTENT_STATUSES } from "@/lib/crm/constants";
 import type { ContentPlannerItemRecord, ContentPlannerMediaAsset, ProfileRecord, ProjectRecord, ServiceRecord } from "@/lib/crm/types";
 
@@ -247,6 +247,29 @@ export function ContentPlanner({
     }
   }
 
+  async function postToFacebook() {
+    if (!selected) {
+      toast.error("Save this content item first", {
+        description: "Facebook posting uses the saved content planner record.",
+      });
+      return;
+    }
+
+    if (!window.confirm(`Post "${selected.title}" to the connected Facebook Page now?`)) return;
+    setBusy(true);
+    const result = await publishContentPlannerItemToFacebook(selected.id);
+    setBusy(false);
+
+    if (!result.ok) {
+      toast.error("Could not post to Facebook", { description: result.error });
+      return;
+    }
+
+    toast.success("Posted to Facebook", { description: result.message });
+    closeModal();
+    router.refresh();
+  }
+
   return (
     <section className="flex min-h-[calc(100dvh-8rem)] flex-col gap-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -441,6 +464,7 @@ export function ContentPlanner({
             </div>
             <div className="shrink-0 flex gap-2 border-t border-cyan-300/10 bg-surface/95 p-5 backdrop-blur">
               <button disabled={busy} className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-60"><Save size={15} />{busy ? "Saving..." : "Save"}</button>
+              {selected ? <button disabled={busy} type="button" onClick={postToFacebook} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-300/30 px-4 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/10 disabled:opacity-60"><Send size={15} />Post</button> : null}
               {selected ? <button disabled={busy} type="button" onClick={remove} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-300/30 text-red-200 hover:bg-red-300/10" aria-label="Delete item"><Trash2 size={16} /></button> : null}
             </div>
           </form>

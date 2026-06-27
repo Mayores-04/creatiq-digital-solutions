@@ -142,6 +142,40 @@ function contentMediaAssets(values: Record<string, unknown>) {
     .slice(0, 10);
 }
 
+function facebookPageConfig() {
+  const pageId =
+    process.env.META_PAGE_ID ??
+    process.env.FACEBOOK_PAGE_ID ??
+    process.env.FB_PAGE_ID ??
+    "";
+  const pageAccessToken =
+    process.env.META_PAGE_ACCESS_TOKEN ??
+    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ??
+    process.env.FB_PAGE_ACCESS_TOKEN ??
+    "";
+  const graphVersion = process.env.META_GRAPH_VERSION ?? "v21.0";
+
+  return { pageId, pageAccessToken, graphVersion };
+}
+
+async function facebookGraphPost<T>(path: string, body: Record<string, string>): Promise<T> {
+  const { pageAccessToken, graphVersion } = facebookPageConfig();
+  const url = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
+  const formData = new URLSearchParams({ ...body, access_token: pageAccessToken });
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+  });
+  const result = await response.json() as T & { error?: { message?: string; type?: string; code?: number } };
+
+  if (!response.ok || result.error) {
+    throw new Error(result.error?.message ?? "Facebook Graph API request failed.");
+  }
+
+  return result;
+}
+
 async function sendAccountNotice({
   to,
   name,
@@ -860,6 +894,108 @@ export async function deleteContentPlannerItem(id: string): Promise<ActionResult
     return { ok: true, message: "Content item deleted." };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to delete content item." };
+  }
+}
+
+export async function publishContentPlannerItemToFacebook(id: string): Promise<ActionResult> {
+  try {
+    const identity = await requireModuleAccess("content-planner", ["ADMIN"]);
+    const contentId = z.uuid().parse(id);
+    const { pageId, pageAccessToken } = facebookPageConfig();
+
+    if (!pageId || !pageAccessToken) {
+      throw new Error("Facebook Page posting is not configured. Add META_PAGE_ID and META_PAGE_ACCESS_TOKEN to .env.");
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const { data: item, error } = await supabase
+      .from("content_planner_items")
+      .select("id, title, description, media_assets, automation_metadata")
+      .eq("id", contentId)
+      .single();
+
+    if (error || !item) throw new Error(error?.message ?? "Content planner item was not found.");
+
+    const message = String(item.description || item.title || "").trim();
+    if (!message) throw new Error("Add a caption or title before posting to Facebook.");
+
+    const mediaAssets = Array.isArray(item.media_assets)
+      ? item.media_assets.flatMap((asset) => {
+          if (!asset || typeof asset !== "object") return [];
+          const candidate = asset as { url?: unknown };
+          return typeof candidate.url === "string" && candidate.url ? [{ url: candidate.url }] : [];
+        })
+      : [];
+
+    let facebookPostId = "";
+    let publishMode: "feed" | "photo" | "multi_photo" = "feed";
+
+    if (mediaAssets.length === 0) {
+      const result = await facebookGraphPost<{ id: string }>(`${pageId}/feed`, {
+        message,
+      });
+      facebookPostId = result.id;
+    } else if (mediaAssets.length === 1) {
+      publishMode = "photo";
+      const result = await facebookGraphPost<{ id: string; post_id?: string }>(`${pageId}/photos`, {
+        url: mediaAssets[0].url,
+        caption: message,
+        published: "true",
+      });
+      facebookPostId = result.post_id ?? result.id;
+    } else {
+      publishMode = "multi_photo";
+      const uploaded = await Promise.all(
+        mediaAssets.slice(0, 10).map((asset) =>
+          facebookGraphPost<{ id: string }>(`${pageId}/photos`, {
+            url: asset.url,
+            published: "false",
+          }),
+        ),
+      );
+
+      const body: Record<string, string> = { message };
+      uploaded.forEach((upload, index) => {
+        body[`attached_media[${index}]`] = JSON.stringify({ media_fbid: upload.id });
+      });
+
+      const result = await facebookGraphPost<{ id: string }>(`${pageId}/feed`, body);
+      facebookPostId = result.id;
+    }
+
+    const automationMetadata =
+      item.automation_metadata && typeof item.automation_metadata === "object" && !Array.isArray(item.automation_metadata)
+        ? item.automation_metadata as Record<string, unknown>
+        : {};
+
+    const { error: updateError } = await supabase
+      .from("content_planner_items")
+      .update({
+        status: "PUBLISHED",
+        automation_metadata: {
+          ...automationMetadata,
+          facebook: {
+            post_id: facebookPostId,
+            page_id: pageId,
+            mode: publishMode,
+            media_count: mediaAssets.length,
+            published_at: new Date().toISOString(),
+            published_by: identity.id,
+          },
+        },
+      })
+      .eq("id", contentId);
+
+    if (updateError) throw new Error(updateError.message);
+
+    await logActivity("content_planner", contentId, "facebook_published", {
+      postId: facebookPostId,
+      mediaCount: mediaAssets.length,
+    });
+    refreshCrm();
+    return { ok: true, message: `Posted to Facebook Page. Post ID: ${facebookPostId}` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to publish to Facebook." };
   }
 }
 
