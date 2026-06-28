@@ -16,7 +16,9 @@ import type {
   ProjectServiceRecord,
   CustomerReviewRecord,
   ContentPlannerItemRecord,
+  FacebookConversationRecord,
   ServiceRecord,
+  MetaWebhookEventRecord,
   TaskRecord,
 } from "./types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -40,6 +42,8 @@ const ALL_ADMIN_WORKSPACE_SECTIONS: Required<AdminWorkspaceInclude> = {
   reviews: true,
   activity: true,
   contentPlannerItems: true,
+  facebookConversations: false,
+  metaWebhookEvents: false,
   settings: true,
 };
 
@@ -63,7 +67,7 @@ export async function getAdminWorkspace(include?: AdminWorkspaceInclude): Promis
   const sections = include ? { ...emptyAdminWorkspaceSections(), ...include } : ALL_ADMIN_WORKSPACE_SECTIONS;
   const adminOnly = identity.role === "ADMIN";
   const needsProjectServices = sections.projectServices || sections.projects;
-  const [profilesResult, accessRolesResult, securityRequestsResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, settingsResult] = await Promise.all([
+  const [profilesResult, accessRolesResult, securityRequestsResult, clientsResult, inquiriesResult, projectsResult, projectServicesResult, membersResult, contributorsResult, tasksResult, documentsResult, servicesResult, reviewsResult, activityResult, contentPlannerResult, facebookConversationsResult, metaWebhookEventsResult, settingsResult] = await Promise.all([
     sections.profiles
       ? supabase.from("profiles").select("id, full_name, email, role, access_role_id, job_title, is_active").order("full_name")
       : emptyList,
@@ -107,7 +111,13 @@ export async function getAdminWorkspace(include?: AdminWorkspaceInclude): Promis
       ? supabase.from("activity_logs").select("id, actor_id, entity_type, entity_id, action, details, created_at").order("created_at", { ascending: false }).limit(80)
       : emptyList,
     sections.contentPlannerItems
-      ? supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_for", { ascending: true })
+      ? supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, planned_time, planned_at, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_at", { ascending: true })
+      : emptyList,
+    sections.facebookConversations
+      ? supabase.from("facebook_conversations").select("id, page_id, psid, display_name, last_event_type, last_message_text, last_message_at, unread_count, created_at, updated_at").order("last_message_at", { ascending: false, nullsFirst: false }).limit(80)
+      : emptyList,
+    sections.metaWebhookEvents
+      ? supabase.from("meta_webhook_events").select("id, page_id, event_type, sender_id, recipient_id, participant_id, message_id, message_text, postback_payload, delivery_watermark, read_watermark, is_echo, raw_event, occurred_at, created_at").order("occurred_at", { ascending: false, nullsFirst: false }).limit(200)
       : emptyList,
     adminOnly && sections.settings
       ? supabase.from("company_settings").select("company_name, company_email, location, logo_url, favicon_url, social_links").eq("id", true).maybeSingle()
@@ -168,6 +178,11 @@ export async function getAdminWorkspace(include?: AdminWorkspaceInclude): Promis
       platform_targets: Array.isArray(item.platform_targets) ? item.platform_targets.map(String) : [],
       automation_metadata: item.automation_metadata && typeof item.automation_metadata === "object" && !Array.isArray(item.automation_metadata) ? item.automation_metadata : {},
     })),
+    facebookConversations: rows(facebookConversationsResult as QueryResult<FacebookConversationRecord[]>, "Facebook conversations"),
+    metaWebhookEvents: rows(metaWebhookEventsResult as QueryResult<MetaWebhookEventRecord[]>, "Meta webhook events").map((event) => ({
+      ...event,
+      raw_event: event.raw_event && typeof event.raw_event === "object" && !Array.isArray(event.raw_event) ? event.raw_event : {},
+    })),
     settings: row(settingsResult as QueryResult<CompanySettingsRecord>, "company settings"),
   };
 }
@@ -189,6 +204,8 @@ function emptyAdminWorkspaceSections(): Required<AdminWorkspaceInclude> {
     reviews: false,
     activity: false,
     contentPlannerItems: false,
+    facebookConversations: false,
+    metaWebhookEvents: false,
     settings: false,
   };
 }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
 import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { clearPublicSiteDataCache } from "@/lib/crm/public-data";
+import { assertFacebookPageConfig, facebookGraphPost } from "@/lib/meta/facebook";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
@@ -63,6 +64,12 @@ function dateOrNull(values: Record<string, unknown>, key: string) {
   const value = String(values[key] ?? "").trim();
   if (!value) return null;
   return z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(value);
+}
+
+function timeOrNull(values: Record<string, unknown>, key: string) {
+  const value = String(values[key] ?? "").trim();
+  if (!value) return null;
+  return z.string().regex(/^\d{2}:\d{2}$/).parse(value);
 }
 
 function slug(values: Record<string, unknown>, key: string) {
@@ -140,40 +147,6 @@ function contentMediaAssets(values: Record<string, unknown>) {
     .filter((result): result is z.ZodSafeParseSuccess<z.infer<typeof contentMediaAssetSchema>> => result.success)
     .map((result) => result.data)
     .slice(0, 10);
-}
-
-function facebookPageConfig() {
-  const pageId =
-    process.env.META_PAGE_ID ??
-    process.env.FACEBOOK_PAGE_ID ??
-    process.env.FB_PAGE_ID ??
-    "";
-  const pageAccessToken =
-    process.env.META_PAGE_ACCESS_TOKEN ??
-    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ??
-    process.env.FB_PAGE_ACCESS_TOKEN ??
-    "";
-  const graphVersion = process.env.META_GRAPH_VERSION ?? "v21.0";
-
-  return { pageId, pageAccessToken, graphVersion };
-}
-
-async function facebookGraphPost<T>(path: string, body: Record<string, string>): Promise<T> {
-  const { pageAccessToken, graphVersion } = facebookPageConfig();
-  const url = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
-  const formData = new URLSearchParams({ ...body, access_token: pageAccessToken });
-  const response = await fetch(url, {
-    method: "POST",
-    body: formData,
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-  });
-  const result = await response.json() as T & { error?: { message?: string; type?: string; code?: number } };
-
-  if (!response.ok || result.error) {
-    throw new Error(result.error?.message ?? "Facebook Graph API request failed.");
-  }
-
-  return result;
 }
 
 async function sendAccountNotice({
@@ -851,12 +824,17 @@ export async function saveContentPlannerItem(values: Record<string, unknown>, id
   try {
     const identity = await requireModuleAccess("content-planner");
     const supabase = await createSupabaseServerClient();
+    const plannedDate = dateOrNull(values, "planned_for") ?? new Date().toISOString().slice(0, 10);
+    const plannedTime = timeOrNull(values, "planned_time") ?? "09:00";
+    const plannedAt = new Date(`${plannedDate}T${plannedTime}:00+08:00`).toISOString();
     const payload = {
       title: requiredText(values, "title", 180),
       channel: requiredText(values, "channel", 80),
       content_type: requiredText(values, "content_type", 80),
       status: z.enum(CONTENT_STATUSES).parse(values.status ?? "IDEA"),
-      planned_for: dateOrNull(values, "planned_for") ?? new Date().toISOString().slice(0, 10),
+      planned_for: plannedDate,
+      planned_time: plannedTime,
+      planned_at: plannedAt,
       description: optionalText(values, "description", 2_000),
       owner_id: optionalUuid(values, "owner_id"),
       project_id: optionalUuid(values, "project_id"),
@@ -901,16 +879,12 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
   try {
     const identity = await requireModuleAccess("content-planner", ["ADMIN"]);
     const contentId = z.uuid().parse(id);
-    const { pageId, pageAccessToken } = facebookPageConfig();
-
-    if (!pageId || !pageAccessToken) {
-      throw new Error("Facebook Page posting is not configured. Add META_PAGE_ID and META_PAGE_ACCESS_TOKEN to .env.");
-    }
+    const { pageId } = assertFacebookPageConfig();
 
     const supabase = await createSupabaseServerClient();
     const { data: item, error } = await supabase
       .from("content_planner_items")
-      .select("id, title, description, media_assets, automation_metadata")
+      .select("id, title, description, status, planned_at, media_assets, automation_metadata")
       .eq("id", contentId)
       .single();
 
@@ -927,15 +901,33 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
         })
       : [];
 
+    const plannedAt = item.planned_at ? new Date(String(item.planned_at)) : null;
+    const scheduleAt =
+      item.status === "SCHEDULED" &&
+      plannedAt &&
+      Number.isFinite(plannedAt.getTime()) &&
+      plannedAt.getTime() > Date.now()
+        ? plannedAt
+        : null;
+    const scheduleSeconds = scheduleAt ? Math.floor(scheduleAt.getTime() / 1000) : null;
+
+    if (scheduleAt && scheduleAt.getTime() < Date.now() + 10 * 60 * 1000) {
+      throw new Error("Facebook scheduled posts must be at least 10 minutes from now.");
+    }
+
     let facebookPostId = "";
-    let publishMode: "feed" | "photo" | "multi_photo" = "feed";
+    let publishMode: "feed" | "photo" | "multi_photo" | "scheduled_feed" | "scheduled_media" = scheduleSeconds ? "scheduled_feed" : "feed";
+    const schedulingFields: Record<string, string> = scheduleSeconds
+      ? { published: "false", scheduled_publish_time: String(scheduleSeconds) }
+      : {};
 
     if (mediaAssets.length === 0) {
       const result = await facebookGraphPost<{ id: string }>(`${pageId}/feed`, {
         message,
+        ...schedulingFields,
       });
       facebookPostId = result.id;
-    } else if (mediaAssets.length === 1) {
+    } else if (mediaAssets.length === 1 && !scheduleSeconds) {
       publishMode = "photo";
       const result = await facebookGraphPost<{ id: string; post_id?: string }>(`${pageId}/photos`, {
         url: mediaAssets[0].url,
@@ -944,7 +936,7 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
       });
       facebookPostId = result.post_id ?? result.id;
     } else {
-      publishMode = "multi_photo";
+      publishMode = scheduleSeconds ? "scheduled_media" : "multi_photo";
       const uploaded = await Promise.all(
         mediaAssets.slice(0, 10).map((asset) =>
           facebookGraphPost<{ id: string }>(`${pageId}/photos`, {
@@ -954,7 +946,7 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
         ),
       );
 
-      const body: Record<string, string> = { message };
+      const body: Record<string, string> = { message, ...schedulingFields };
       uploaded.forEach((upload, index) => {
         body[`attached_media[${index}]`] = JSON.stringify({ media_fbid: upload.id });
       });
@@ -971,7 +963,7 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
     const { error: updateError } = await supabase
       .from("content_planner_items")
       .update({
-        status: "PUBLISHED",
+        status: scheduleSeconds ? "SCHEDULED" : "PUBLISHED",
         automation_metadata: {
           ...automationMetadata,
           facebook: {
@@ -979,8 +971,9 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
             page_id: pageId,
             mode: publishMode,
             media_count: mediaAssets.length,
-            published_at: new Date().toISOString(),
-            published_by: identity.id,
+            scheduled_at: scheduleAt?.toISOString() ?? null,
+            published_at: scheduleSeconds ? null : new Date().toISOString(),
+            acted_by: identity.id,
           },
         },
       })
@@ -988,12 +981,18 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
 
     if (updateError) throw new Error(updateError.message);
 
-    await logActivity("content_planner", contentId, "facebook_published", {
+    await logActivity("content_planner", contentId, scheduleSeconds ? "facebook_scheduled" : "facebook_published", {
       postId: facebookPostId,
       mediaCount: mediaAssets.length,
+      scheduledAt: scheduleAt?.toISOString() ?? null,
     });
     refreshCrm();
-    return { ok: true, message: `Posted to Facebook Page. Post ID: ${facebookPostId}` };
+    return {
+      ok: true,
+      message: scheduleSeconds
+        ? `Scheduled to Facebook Page. Post ID: ${facebookPostId}`
+        : `Posted to Facebook Page. Post ID: ${facebookPostId}`,
+    };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to publish to Facebook." };
   }

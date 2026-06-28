@@ -167,6 +167,8 @@ export type ContentPlannerItemRecord = {
   content_type: string;
   status: "IDEA" | "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED";
   planned_for: string;
+  planned_time: string | null;
+  planned_at: string | null;
   description: string | null;
   owner_id: string | null;
   project_id: string | null;
@@ -213,5 +215,38 @@ export type AdminWorkspace = {
   reviews: CustomerReviewRecord[];
   activity: ActivityRecord[];
   contentPlannerItems: ContentPlannerItemRecord[];
+  facebookConversations: FacebookConversationRecord[];
+  metaWebhookEvents: MetaWebhookEventRecord[];
   settings: CompanySettingsRecord | null;
+};
+
+export type FacebookConversationRecord = {
+  id: string;
+  page_id: string;
+  psid: string;
+  display_name: string | null;
+  last_event_type: string | null;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MetaWebhookEventRecord = {
+  id: string;
+  page_id: string;
+  event_type: "MESSAGE" | "POSTBACK" | "DELIVERY" | "READ" | "ECHO" | "OTHER";
+  sender_id: string | null;
+  recipient_id: string | null;
+  participant_id: string | null;
+  message_id: string | null;
+  message_text: string | null;
+  postback_payload: string | null;
+  delivery_watermark: string | null;
+  read_watermark: string | null;
+  is_echo: boolean;
+  raw_event: Record<string, unknown>;
+  occurred_at: string | null;
+  created_at: string;
 };

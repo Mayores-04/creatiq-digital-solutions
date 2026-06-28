@@ -219,6 +219,7 @@ export function ContentPlanner({
       content_type: String(data.get("content_type") ?? ""),
       status: String(data.get("status") ?? "IDEA"),
       planned_for: String(data.get("planned_for") ?? ""),
+      planned_time: String(data.get("planned_time") ?? ""),
       description: caption,
       owner_id: String(data.get("owner_id") ?? ""),
       project_id: String(data.get("project_id") ?? ""),
@@ -347,7 +348,7 @@ export function ContentPlanner({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-bold text-primary">{item.title}</p>
-                    <p className="mt-1 text-xs text-muted">{item.planned_for} - {item.channel} - {item.status}</p>
+                    <p className="mt-1 text-xs text-muted">{formatContentSchedule(item)} - {item.channel} - {item.status}</p>
                     {item.owner_id ? <p className="mt-1 text-xs text-muted">Owner: {names.get(item.owner_id) ?? "Team member"}</p> : null}
                     {item.media_assets?.length ? (
                       <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-secondary">
@@ -386,6 +387,7 @@ export function ContentPlanner({
             <div className="custom-scrollbar grid flex-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
               <Field label="Title" name="title" defaultValue={selected?.title ?? ""} required />
               <Field label="Planned date" name="planned_for" type="date" defaultValue={selected?.planned_for ?? formatDateKey(new Date(selectedYear, selectedMonth, 1))} required />
+              <Field label="Planned time" name="planned_time" type="time" defaultValue={(selected?.planned_time ?? "09:00").slice(0, 5)} required />
               <Field label="Channel" name="channel" defaultValue={selected?.channel ?? "Website"} required />
               <Field label="Content type" name="content_type" defaultValue={selected?.content_type ?? "Post"} required />
               <Select label="Status" name="status" defaultValue={selected?.status ?? "IDEA"} options={CONTENT_STATUSES.map((status) => ({ value: status, label: status.replaceAll("_", " ") }))} />
@@ -464,7 +466,7 @@ export function ContentPlanner({
             </div>
             <div className="shrink-0 flex gap-2 border-t border-cyan-300/10 bg-surface/95 p-5 backdrop-blur">
               <button disabled={busy} className="primary-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-60"><Save size={15} />{busy ? "Saving..." : "Save"}</button>
-              {selected ? <button disabled={busy} type="button" onClick={postToFacebook} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-300/30 px-4 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/10 disabled:opacity-60"><Send size={15} />Post</button> : null}
+              {selected ? <button disabled={busy} type="button" onClick={postToFacebook} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-300/30 px-4 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/10 disabled:opacity-60"><Send size={15} />{selected.status === "SCHEDULED" ? "Schedule" : "Post"}</button> : null}
               {selected ? <button disabled={busy} type="button" onClick={remove} className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-300/30 text-red-200 hover:bg-red-300/10" aria-label="Delete item"><Trash2 size={16} /></button> : null}
             </div>
           </form>
@@ -490,6 +492,11 @@ function formatDateKey(date: Date) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("-");
+}
+
+function formatContentSchedule(item: ContentPlannerItemRecord) {
+  const time = item.planned_time ? item.planned_time.slice(0, 5) : "";
+  return time ? `${item.planned_for} ${time}` : item.planned_for;
 }
 
 function CaptionComposer({

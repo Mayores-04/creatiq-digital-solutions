@@ -20,6 +20,7 @@ export const ADMIN_MODULES = [
   { key: "services", label: "Services" },
   { key: "reports", label: "Reports" },
   { key: "content-planner", label: "Content Planner" },
+  { key: "facebook", label: "Facebook Page" },
   { key: "notifications", label: "Notifications" },
   { key: "activity", label: "Activity Center" },
   { key: "settings", label: "Company Settings" },
