@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
 import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { clearPublicSiteDataCache } from "@/lib/crm/public-data";
-import { assertFacebookPageConfig, facebookGraphPost } from "@/lib/meta/facebook";
+import { assertFacebookPageConfig, facebookGraphPost, getFacebookConversationMessages, getFacebookPageConversations, sendFacebookMessengerText } from "@/lib/meta/facebook";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
@@ -996,6 +996,183 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to publish to Facebook." };
   }
+}
+
+export async function sendFacebookMessengerReply(values: {
+  psid: string;
+  message: string;
+}): Promise<ActionResult> {
+  try {
+    const identity = await requireModuleAccess("facebook");
+    const psid = z.string().trim().min(3).max(120).parse(values.psid);
+    const message = z.string().trim().min(1).max(1_800).parse(values.message);
+    const { pageId } = assertFacebookPageConfig();
+
+    const result = await sendFacebookMessengerText(psid, message);
+    const messageId = result.message_id ?? `local_${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const admin = createSupabaseAdminClient();
+
+    const { error: eventError } = await admin.from("meta_webhook_events").insert({
+      page_id: pageId,
+      event_type: "ECHO",
+      sender_id: pageId,
+      recipient_id: psid,
+      participant_id: psid,
+      message_id: messageId,
+      message_text: message,
+      is_echo: true,
+      raw_event: {
+        source: "creatiq_admin_reply",
+        sent_by: identity.id,
+        facebook_response: result,
+      },
+      occurred_at: now,
+    });
+
+    if (eventError && !eventError.message.toLowerCase().includes("duplicate")) {
+      throw new Error(eventError.message);
+    }
+
+    const { error: conversationError } = await admin.from("facebook_conversations").upsert(
+      {
+        page_id: pageId,
+        psid,
+        last_event_type: "ECHO",
+        last_message_text: message,
+        last_message_at: now,
+        unread_count: 0,
+        updated_at: now,
+      },
+      { onConflict: "page_id,psid" },
+    );
+
+    if (conversationError) throw new Error(conversationError.message);
+
+    await logActivity("facebook_conversation", null, "message_sent", {
+      psid,
+      messageId,
+    });
+    revalidatePath("/admin/facebook/messages");
+
+    return { ok: true, message: "Reply sent to Facebook Messenger." };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to send Messenger reply.",
+    };
+  }
+}
+
+export async function syncFacebookMessengerHistory(): Promise<ActionResult> {
+  try {
+    await requireModuleAccess("facebook");
+    const { pageId } = assertFacebookPageConfig();
+    const conversations = await getFacebookPageConversations(100, 10);
+    const admin = createSupabaseAdminClient();
+    let importedMessages = 0;
+
+    for (const conversation of conversations) {
+      const participant = conversation.participants?.data?.find((person) => person.id && person.id !== pageId);
+      const messages = (await getFacebookConversationMessages(conversation.id, 100, 10)).sort((a, b) =>
+        timestampValue(a.created_time) - timestampValue(b.created_time),
+      );
+      const psid =
+        participant?.id ??
+        messages.map((message) => deriveMessageParticipantId(message, pageId)).find(Boolean);
+      if (!psid) continue;
+      const participantName = participant?.name ?? null;
+      const participantPicture = participant?.picture?.data?.url ?? null;
+
+      const latestMessage = messages[messages.length - 1];
+      const latestText = latestMessage ? messageText(latestMessage) : null;
+      const latestAt = latestMessage?.created_time ?? conversation.updated_time ?? new Date().toISOString();
+
+      const { error: conversationError } = await admin.from("facebook_conversations").upsert(
+        {
+          page_id: pageId,
+          psid,
+          display_name: participantName,
+          raw_profile: {
+            id: psid,
+            displayName: participantName,
+            name: participantName,
+            profile_pic: participantPicture,
+          },
+          last_event_type: latestMessage?.from?.id === pageId ? "ECHO" : "MESSAGE",
+          last_message_text: latestText,
+          last_message_at: latestAt,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "page_id,psid" },
+      );
+      if (conversationError) throw new Error(conversationError.message);
+
+      for (const message of messages) {
+        if (!message.id) continue;
+        const isEcho = message.from?.id === pageId;
+        const participantId = deriveMessageParticipantId(message, pageId) ?? psid;
+        const occurredAt = message.created_time ?? latestAt;
+        const { error } = await admin.from("meta_webhook_events").insert(
+          {
+            page_id: pageId,
+            event_type: isEcho ? "ECHO" : "MESSAGE",
+            sender_id: message.from?.id ?? null,
+            recipient_id: isEcho ? participantId : pageId,
+            participant_id: participantId,
+            message_id: message.id,
+            message_text: messageText(message),
+            is_echo: isEcho,
+            raw_event: {
+              source: "facebook_history_sync",
+              conversation_id: conversation.id,
+              message,
+            },
+            occurred_at: occurredAt,
+          },
+        );
+        if (error && !isDuplicateDbError(error)) throw new Error(error.message);
+        if (!error) importedMessages += 1;
+      }
+    }
+
+    revalidatePath("/admin/facebook/messages");
+    return {
+      ok: true,
+      message: `Synced ${conversations.length} conversations and ${importedMessages} messages from Facebook.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to sync Facebook Messenger history.",
+    };
+  }
+}
+
+function timestampValue(value?: string | null) {
+  return value ? new Date(value).getTime() : 0;
+}
+
+function deriveMessageParticipantId(
+  message: {
+    from?: { id?: string };
+    to?: { data?: Array<{ id?: string }> };
+  },
+  pageId: string,
+) {
+  if (message.from?.id && message.from.id !== pageId) return message.from.id;
+  return message.to?.data?.find((person) => person.id && person.id !== pageId)?.id ?? null;
+}
+
+function isDuplicateDbError(error: { code?: string; message?: string }) {
+  return error.code === "23505" || (error.message ?? "").toLowerCase().includes("duplicate");
+}
+
+function messageText(message: { message?: string; attachments?: { data?: unknown[] } }) {
+  return message.message?.trim() || (message.attachments?.data?.length ? "[Attachment]" : "");
 }
 
 export async function updateMyProfile(values: { fullName: string; jobTitle?: string }): Promise<ActionResult> {

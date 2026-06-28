@@ -114,7 +114,7 @@ export async function getAdminWorkspace(include?: AdminWorkspaceInclude): Promis
       ? supabase.from("content_planner_items").select("id, title, channel, content_type, status, planned_for, planned_time, planned_at, description, owner_id, project_id, service_id, media_assets, platform_targets, automation_metadata, created_at").order("planned_at", { ascending: true })
       : emptyList,
     sections.facebookConversations
-      ? supabase.from("facebook_conversations").select("id, page_id, psid, display_name, last_event_type, last_message_text, last_message_at, unread_count, created_at, updated_at").order("last_message_at", { ascending: false, nullsFirst: false }).limit(80)
+      ? supabase.from("facebook_conversations").select("id, page_id, psid, display_name, raw_profile, last_event_type, last_message_text, last_message_at, unread_count, created_at, updated_at").order("last_message_at", { ascending: false, nullsFirst: false }).limit(80)
       : emptyList,
     sections.metaWebhookEvents
       ? supabase.from("meta_webhook_events").select("id, page_id, event_type, sender_id, recipient_id, participant_id, message_id, message_text, postback_payload, delivery_watermark, read_watermark, is_echo, raw_event, occurred_at, created_at").order("occurred_at", { ascending: false, nullsFirst: false }).limit(200)

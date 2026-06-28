@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getFacebookMessengerProfile } from "@/lib/meta/facebook";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -11,6 +12,7 @@ type MetaMessagingEvent = {
     mid?: string;
     text?: string;
     is_echo?: boolean;
+    is_deleted?: boolean;
     attachments?: unknown[];
   };
   postback?: {
@@ -140,6 +142,23 @@ function normalizeMessagingEvent(pageId: string, event: MetaMessagingEvent) {
 
   if (event.message) {
     const isEcho = event.message.is_echo === true;
+    if (event.message.is_deleted === true) {
+      return {
+        pageId,
+        eventType: "OTHER",
+        senderId,
+        recipientId,
+        participantId,
+        messageId: event.message.mid ?? null,
+        messageText: "Message was unsent",
+        postbackPayload: null,
+        deliveryWatermark: null,
+        readWatermark: null,
+        isEcho,
+        occurredAt,
+      };
+    }
+
     return {
       pageId,
       eventType: isEcho ? "ECHO" : "MESSAGE",
@@ -230,10 +249,14 @@ async function upsertConversation(record: ReturnType<typeof normalizeMessagingEv
 
   const { data: current } = await supabase
     .from("facebook_conversations")
-    .select("id, unread_count")
+    .select("id, unread_count, display_name, raw_profile")
     .eq("page_id", record.pageId)
     .eq("psid", record.participantId)
     .maybeSingle();
+
+  const profile = !current?.display_name && ["MESSAGE", "POSTBACK"].includes(record.eventType)
+    ? await loadMessengerProfile(record.participantId)
+    : null;
 
   const unreadCount =
     record.eventType === "READ"
@@ -242,16 +265,32 @@ async function upsertConversation(record: ReturnType<typeof normalizeMessagingEv
         ? Number(current?.unread_count ?? 0) + 1
         : Number(current?.unread_count ?? 0);
 
-  await supabase.from("facebook_conversations").upsert(
-    {
-      page_id: record.pageId,
-      psid: record.participantId,
-      last_event_type: record.eventType,
-      last_message_text: record.messageText,
-      last_message_at: record.occurredAt,
-      unread_count: unreadCount,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "page_id,psid" },
-  );
+  const payload: Record<string, unknown> = {
+    page_id: record.pageId,
+    psid: record.participantId,
+    last_event_type: record.eventType,
+    last_message_text: record.messageText,
+    last_message_at: record.occurredAt,
+    unread_count: unreadCount,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (profile?.displayName) payload.display_name = profile.displayName;
+  if (profile) payload.raw_profile = profile;
+
+  await supabase
+    .from("facebook_conversations")
+    .upsert(payload, { onConflict: "page_id,psid" });
+}
+
+async function loadMessengerProfile(psid: string) {
+  try {
+    return await getFacebookMessengerProfile(psid);
+  } catch (error) {
+    console.warn(
+      "Unable to load Messenger profile:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
 }

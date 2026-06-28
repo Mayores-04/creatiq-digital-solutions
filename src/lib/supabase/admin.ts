@@ -28,7 +28,7 @@ export function createSupabaseAdminClient() {
   const keyRole = getJwtRole(serviceRoleKey);
   if (keyRole && keyRole !== "service_role") {
     throw new Error(
-      "User invitations require the Supabase service_role secret. Replace SUPABASE_SERVICE_ROLE_KEY with the server-only service_role key from your Supabase dashboard.",
+      "SUPABASE_SERVICE_ROLE_KEY must be the server-only service_role secret from your Supabase dashboard. The configured key is not a service_role key, so admin webhooks, invitations, and secure server writes cannot save data.",
     );
   }
 

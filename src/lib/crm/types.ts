@@ -225,6 +225,13 @@ export type FacebookConversationRecord = {
   page_id: string;
   psid: string;
   display_name: string | null;
+  raw_profile: {
+    displayName?: string | null;
+    name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    profile_pic?: string | null;
+  } | null;
   last_event_type: string | null;
   last_message_text: string | null;
   last_message_at: string | null;

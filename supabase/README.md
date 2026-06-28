@@ -4,11 +4,9 @@ The CRM is intentionally secure-by-default: there is no public registration and 
 
 ## 1. Apply the schema
 
-Open the Supabase project SQL Editor and run:
+Open the Supabase project SQL Editor and run the migrations in order.
 
-`migrations/20260623_000001_creatiq_crm.sql`
-
-It creates the CRM tables, RLS policies, published-site policies, private `creatiq-digital-solutions` bucket, public-service seeds, and the Staff-only operational RPCs. Apply every migration in order, including the unified Projects, Admin-role, contributor, pipeline, and customer-review migration.
+The migrations create the CRM tables, RLS policies, published-site policies, private `creatiq-digital-solutions` bucket, public-service seeds, Staff-only operational RPCs, unified Projects data, Admin-role security, contributors, pipeline logic, customer reviews, content planner media, and Meta/Facebook webhook storage.
 
 ## 2. Create the first Admin
 
@@ -28,7 +26,11 @@ Never expose an Admin invite or promotion flow on the public site.
 
 ## 3. Configure environment variables
 
-Copy the root `.env.example` into `.env.local` and fill the values from the Supabase project, Cloudinary, and SMTP provider. The `SUPABASE_SERVICE_ROLE_KEY` must be the actual **service_role** secret from Supabase’s API settings—not a publishable/anon key. It is used only for secure Admin-created user invitations; website inquiries use a dedicated, validated database RPC.
+Copy the root `.env.example` into `.env.local` and fill the values from the Supabase project, Cloudinary, SMTP provider, and Meta.
+
+The `SUPABASE_SERVICE_ROLE_KEY` must be the actual **service_role** secret from Supabase's API settings — not a publishable/anon key. It is used only on the server for secure Admin-created user invitations, Meta webhook persistence, and other trusted server writes; website inquiries use a dedicated, validated database RPC.
+
+For deployed environments such as Vercel, configure the same server-only variables there too. A correct local `.env` does not update Vercel automatically.
 
 ## 4. Confirm security
 

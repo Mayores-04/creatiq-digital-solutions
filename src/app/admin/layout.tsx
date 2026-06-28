@@ -5,6 +5,7 @@ import {
   AdminHeader,
   type AdminNotification,
 } from "@/components/admin/admin-header";
+import { AdminLiveSync } from "@/components/admin/admin-live-sync";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { getAdminIdentity } from "@/lib/crm/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -65,6 +66,7 @@ export default async function AdminLayout({
       <AdminSidebar role={identity.role} permissions={identity.permissions} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:pl-72">
+        <AdminLiveSync />
         <AdminHeader
           identity={identity}
           notifications={notifications}
