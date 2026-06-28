@@ -131,8 +131,8 @@ export default async function FacebookMessengerInboxPage({
                   <Inbox className="mx-auto text-secondary" size={30} />
                   <p className="mt-3 text-sm font-bold text-primary">No Messenger events yet.</p>
                   <p className="mt-1 text-xs leading-5 text-muted">
-                    Send a new test message to the Facebook Page after applying
-                    the database migration.
+                    Send a new test message after deploying this webhook code,
+                    or point Meta to a public tunnel for localhost.
                   </p>
                 </div>
               </div>

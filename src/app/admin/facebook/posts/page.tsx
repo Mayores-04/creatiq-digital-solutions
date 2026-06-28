@@ -1,4 +1,4 @@
-import { ExternalLink, Images, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Images, RefreshCw, ShieldCheck } from "lucide-react";
 import { getFacebookPagePosts } from "@/lib/meta/facebook";
 import { requireModuleAccess } from "@/lib/crm/auth";
 
@@ -42,12 +42,7 @@ export default async function FacebookPageUploadsPage() {
         </a>
       </div>
 
-      {errorMessage ? (
-        <div className="rounded-2xl border border-red-300/20 bg-red-950/25 p-5">
-          <p className="text-sm font-bold text-red-100">Couldn’t load Facebook uploads</p>
-          <p className="mt-2 text-sm leading-6 text-red-100/75">{errorMessage}</p>
-        </div>
-      ) : null}
+      {errorMessage ? <FacebookPermissionNotice message={errorMessage} /> : null}
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {posts.length ? (
@@ -66,6 +61,45 @@ export default async function FacebookPageUploadsPage() {
         )}
       </div>
     </section>
+  );
+}
+
+function FacebookPermissionNotice({ message }: { message: string }) {
+  const permissionError =
+    message.includes("pages_read_engagement") ||
+    message.includes("Page Public Content Access") ||
+    message.includes("(#10)");
+
+  return (
+    <div className="rounded-2xl border border-amber-300/25 bg-amber-950/20 p-5">
+      <div className="flex gap-3">
+        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-300/10 text-amber-200">
+          {permissionError ? <ShieldCheck size={18} /> : <AlertTriangle size={18} />}
+        </span>
+        <div>
+          <p className="text-sm font-bold text-amber-100">
+            Couldn&apos;t load Facebook uploads
+          </p>
+          <p className="mt-2 text-sm leading-6 text-amber-100/75">{message}</p>
+          {permissionError ? (
+            <div className="mt-4 rounded-xl border border-amber-300/15 bg-background/30 p-4 text-xs leading-6 text-amber-100/75">
+              <p className="font-bold text-amber-100">What to add in Meta:</p>
+              <p>
+                Your Page token can post/message, but it cannot read Page feed
+                posts yet. Regenerate the Page token with{" "}
+                <span className="font-bold text-amber-100">pages_read_engagement</span>
+                . If Meta asks for review on production, request that permission
+                or Page Public Content Access.
+              </p>
+              <p className="mt-2">
+                Messenger Inbox can still work without this feed-read
+                permission as long as the deployed webhook saves events.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
