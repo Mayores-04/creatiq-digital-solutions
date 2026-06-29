@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, type RefObject, useMemo, useRef, useState } from "react";
-import { Bold, CalendarDays, Hash, ImageIcon, Italic, List, ListOrdered, MessageSquareText, Pencil, Plus, Quote, Save, Send, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Bold, CalendarDays, Hash, ImageIcon, Italic, List, ListOrdered, MessageSquareText, Pencil, Play, Plus, Quote, Save, Send, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { deleteContentPlannerItem, publishContentPlannerItemToFacebook, saveContentPlannerItem } from "@/app/admin/actions";
@@ -154,15 +154,17 @@ export function ContentPlanner({
     setMediaAssets((current) => current.filter((asset) => asset.id !== id));
   }
 
-  async function uploadMediaImages(files: FileList | null) {
-    const images = Array.from(files ?? []).filter((file) => file.type.startsWith("image/"));
-    if (!images.length) return;
+  async function uploadMediaFiles(files: FileList | null) {
+    const mediaFiles = Array.from(files ?? []).filter((file) =>
+      file.type.startsWith("image/") || file.type.startsWith("video/"),
+    );
+    if (!mediaFiles.length) return;
 
     const remainingSlots = Math.max(0, 10 - mediaAssets.length);
-    const acceptedImages = images.slice(0, remainingSlots);
-    if (!acceptedImages.length) {
+    const acceptedFiles = mediaFiles.slice(0, remainingSlots);
+    if (!acceptedFiles.length) {
       toast.error("Media limit reached", {
-        description: "A content plan can hold up to 10 images for now.",
+        description: "A content plan can hold up to 10 media files.",
       });
       return;
     }
@@ -171,7 +173,7 @@ export function ContentPlanner({
     try {
       const uploaded: ContentPlannerMediaAsset[] = [];
 
-      for (const file of acceptedImages) {
+      for (const file of acceptedFiles) {
         const formData = new FormData();
         formData.set("file", file);
         formData.set("purpose", "content");
@@ -180,7 +182,7 @@ export function ContentPlanner({
           method: "POST",
           body: formData,
         });
-        const result = await response.json() as { url?: string; publicId?: string; error?: string };
+        const result = await response.json() as { url?: string; publicId?: string; resourceType?: string; error?: string };
 
         if (!response.ok || !result.url) {
           throw new Error(result.error ?? `Unable to upload ${file.name}.`);
@@ -198,9 +200,9 @@ export function ContentPlanner({
       }
 
       setMediaAssets((current) => [...current, ...uploaded]);
-      toast.success(`${uploaded.length} image${uploaded.length === 1 ? "" : "s"} uploaded.`);
+      toast.success(`${uploaded.length} media file${uploaded.length === 1 ? "" : "s"} uploaded.`);
     } catch (error) {
-      toast.error("Could not upload image", {
+      toast.error("Could not upload media", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
@@ -353,7 +355,7 @@ export function ContentPlanner({
                     {item.media_assets?.length ? (
                       <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-secondary">
                         <ImageIcon size={12} />
-                        {item.media_assets.length} image{item.media_assets.length === 1 ? "" : "s"}
+                        {item.media_assets.length} media file{item.media_assets.length === 1 ? "" : "s"}
                       </p>
                     ) : null}
                   </div>
@@ -414,21 +416,21 @@ export function ContentPlanner({
                 <div className="rounded-2xl border border-cyan-300/15 bg-background/35 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">Post images</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-secondary">Post media</p>
                       <p className="mt-1 text-xs leading-5 text-muted">
-                        Add one or more creatives for this planned post. Saved metadata is automation-ready for future Facebook/page publishing.
+                        Add images or videos for this planned post. Saved metadata is automation-ready for future Facebook/page publishing.
                       </p>
                     </div>
                     <label className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-300/20 px-3 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/10 ${uploadingMedia ? "pointer-events-none opacity-60" : ""}`}>
                       <Upload size={14} />
-                      {uploadingMedia ? "Uploading..." : "Upload images"}
+                      {uploadingMedia ? "Uploading..." : "Upload media"}
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/*"
                         multiple
                         disabled={uploadingMedia}
                         onChange={(event) => {
-                          void uploadMediaImages(event.target.files);
+                          void uploadMediaFiles(event.target.files);
                           event.currentTarget.value = "";
                         }}
                         className="sr-only"
@@ -441,15 +443,22 @@ export function ContentPlanner({
                       {mediaAssets.map((asset, index) => (
                         <div key={asset.id} className="group relative overflow-hidden rounded-xl border border-cyan-300/15 bg-surface/80">
                           <div className="relative aspect-video bg-background/80">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={asset.url} alt={asset.alt ?? asset.fileName ?? `Content media ${index + 1}`} className="h-full w-full object-cover" />
+                            {asset.mimeType?.startsWith("video/") ? (
+                              <video src={asset.url} className="h-full w-full object-cover" controls preload="metadata" />
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={asset.url} alt={asset.alt ?? asset.fileName ?? `Content media ${index + 1}`} className="h-full w-full object-cover" />
+                            )}
                           </div>
                           <div className="flex items-center justify-between gap-2 p-3">
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-primary">{asset.fileName ?? `Image ${index + 1}`}</p>
-                              <p className="mt-0.5 text-[10px] uppercase tracking-widest text-muted">Image {index + 1}</p>
+                              <p className="truncate text-xs font-bold text-primary">{asset.fileName ?? `Media ${index + 1}`}</p>
+                              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted">
+                                {asset.mimeType?.startsWith("video/") ? <Play size={10} /> : <ImageIcon size={10} />}
+                                {asset.mimeType?.startsWith("video/") ? "Video" : "Image"} {index + 1}
+                              </p>
                             </div>
-                            <button type="button" onClick={() => removeMediaAsset(asset.id)} className="rounded-lg border border-red-300/25 p-2 text-red-200 transition hover:bg-red-300/10" aria-label="Remove image">
+                            <button type="button" onClick={() => removeMediaAsset(asset.id)} className="rounded-lg border border-red-300/25 p-2 text-red-200 transition hover:bg-red-300/10" aria-label="Remove media">
                               <X size={14} />
                             </button>
                           </div>
@@ -458,7 +467,7 @@ export function ContentPlanner({
                     </div>
                   ) : (
                     <div className="mt-4 flex min-h-28 items-center justify-center rounded-xl border border-dashed border-cyan-300/20 text-center text-xs leading-5 text-muted">
-                      No images attached yet. Upload the post creatives here.
+                      No media attached yet. Upload post images or videos here.
                     </div>
                   )}
                 </div>

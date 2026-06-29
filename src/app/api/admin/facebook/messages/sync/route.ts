@@ -14,14 +14,9 @@ export async function POST(request: Request) {
   const url = new URL(request.url);
   const psid = url.searchParams.get("conversation")?.trim();
 
-  if (!psid) {
-    return NextResponse.json(
-      { ok: false, error: "Conversation is required." },
-      { status: 400 },
-    );
-  }
-
-  const result = await syncFacebookConversationByPsid(psid);
+  const result = psid
+    ? await syncFacebookConversationByPsid(psid)
+    : await syncChangedFacebookConversations();
   return NextResponse.json(result, {
     headers: {
       "cache-control": "no-store",
@@ -29,9 +24,65 @@ export async function POST(request: Request) {
   });
 }
 
-async function syncFacebookConversationByPsid(psid: string) {
+async function syncChangedFacebookConversations() {
   const { pageId } = assertFacebookPageConfig();
   const admin = createSupabaseAdminClient();
+  const conversations = await getFacebookPageConversations(100, 3);
+  const psids = conversations.flatMap((conversation) => {
+    const participant = conversation.participants?.data?.find(
+      (person) => person.id && person.id !== pageId,
+    );
+    return participant?.id ? [participant.id] : [];
+  });
+
+  const { data: existing, error } = psids.length
+    ? await admin
+        .from("facebook_conversations")
+        .select("psid, last_message_at, updated_at")
+        .in("psid", psids)
+    : { data: [], error: null };
+
+  if (error) throw new Error(error.message);
+
+  const existingByPsid = new Map(
+    (existing ?? []).map((conversation) => [
+      conversation.psid as string,
+      conversation as { last_message_at?: string | null; updated_at?: string | null },
+    ]),
+  );
+  let imported = 0;
+  let scanned = 0;
+
+  for (const conversation of conversations) {
+    const participant = conversation.participants?.data?.find(
+      (person) => person.id && person.id !== pageId,
+    );
+    const psid = participant?.id;
+    if (!psid) continue;
+
+    const facebookUpdatedAt = timestampValue(conversation.updated_time);
+    const local = existingByPsid.get(psid);
+    const localUpdatedAt = Math.max(
+      timestampValue(local?.last_message_at),
+      timestampValue(local?.updated_at),
+    );
+
+    if (local && facebookUpdatedAt <= localUpdatedAt + 1_500) continue;
+
+    scanned += 1;
+    const result = await syncFacebookConversation(conversation, psid);
+    imported += result.imported;
+  }
+
+  return {
+    ok: true,
+    imported,
+    scanned,
+    changed: imported > 0,
+  };
+}
+
+async function syncFacebookConversationByPsid(psid: string) {
   const conversations = await getFacebookPageConversations(100, 10);
   const conversation = conversations.find((item) =>
     item.participants?.data?.some((participant) => participant.id === psid),
@@ -41,6 +92,16 @@ async function syncFacebookConversationByPsid(psid: string) {
     return { ok: true, imported: 0, changed: false };
   }
 
+  const result = await syncFacebookConversation(conversation, psid);
+  return { ok: true, ...result, changed: result.imported > 0 };
+}
+
+async function syncFacebookConversation(
+  conversation: Awaited<ReturnType<typeof getFacebookPageConversations>>[number],
+  psid: string,
+) {
+  const { pageId } = assertFacebookPageConfig();
+  const admin = createSupabaseAdminClient();
   const participant = conversation.participants?.data?.find(
     (person) => person.id && person.id !== pageId,
   );
@@ -90,7 +151,7 @@ async function syncFacebookConversationByPsid(psid: string) {
       message_text: messageText(message),
       is_echo: isEcho,
       raw_event: {
-        source: "active_conversation_graph_sync",
+        source: "conversation_graph_sync",
         conversation_id: conversation.id,
         message,
       },
@@ -101,7 +162,7 @@ async function syncFacebookConversationByPsid(psid: string) {
     if (!error) imported += 1;
   }
 
-  return { ok: true, imported, changed: imported > 0 };
+  return { imported };
 }
 
 function timestampValue(value?: string | null) {

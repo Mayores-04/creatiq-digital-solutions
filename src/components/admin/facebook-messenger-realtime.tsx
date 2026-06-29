@@ -8,13 +8,9 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 type RealtimeStatus = "connecting" | "live" | "offline";
 type ChannelStatus = "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR";
 const POLL_INTERVAL_MS = 2_500;
-const ACTIVE_CONVERSATION_SYNC_MS = 5_000;
+const FACEBOOK_GRAPH_SYNC_MS = 5_000;
 
-export function FacebookMessengerRealtime({
-  conversationPsid,
-}: {
-  conversationPsid?: string;
-}) {
+export function FacebookMessengerRealtime() {
   const router = useRouter();
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGraphSyncRef = useRef(0);
@@ -38,18 +34,12 @@ export function FacebookMessengerRealtime({
 
       try {
         const now = Date.now();
-        if (
-          conversationPsid &&
-          now - lastGraphSyncRef.current >= ACTIVE_CONVERSATION_SYNC_MS
-        ) {
+        if (now - lastGraphSyncRef.current >= FACEBOOK_GRAPH_SYNC_MS) {
           lastGraphSyncRef.current = now;
-          const syncResponse = await fetch(
-            `/api/admin/facebook/messages/sync?conversation=${encodeURIComponent(conversationPsid)}`,
-            {
-              method: "POST",
-              cache: "no-store",
-            },
-          );
+          const syncResponse = await fetch("/api/admin/facebook/messages/sync", {
+            method: "POST",
+            cache: "no-store",
+          });
           if (syncResponse.ok) {
             const syncPayload = (await syncResponse.json()) as {
               changed?: boolean;
@@ -134,7 +124,7 @@ export function FacebookMessengerRealtime({
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
       void supabase.removeChannel(channel);
     };
-  }, [conversationPsid, router]);
+  }, [router]);
 
   return (
     <span

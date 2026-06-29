@@ -1,4 +1,5 @@
 import { AlertTriangle, ExternalLink, Images, RefreshCw, ShieldCheck } from "lucide-react";
+import { FacebookPostImportButton } from "@/components/admin/facebook-post-import-button";
 import { getFacebookPagePosts } from "@/lib/meta/facebook";
 import { requireModuleAccess } from "@/lib/crm/auth";
 
@@ -33,13 +34,16 @@ export default async function FacebookPageUploadsPage() {
           </p>
         </div>
 
-        <a
-          href="/admin/facebook/posts"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/15"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <FacebookPostImportButton />
+          <a
+            href="/admin/facebook/posts"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 text-[10px] font-black uppercase tracking-widest text-secondary transition hover:bg-cyan-300/15"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </a>
+        </div>
       </div>
 
       {errorMessage ? <FacebookPermissionNotice message={errorMessage} /> : null}

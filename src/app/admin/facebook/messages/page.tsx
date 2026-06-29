@@ -115,7 +115,7 @@ export default async function FacebookMessengerInboxPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <FacebookMessengerRealtime conversationPsid={effectivePsid || undefined} />
+          <FacebookMessengerRealtime />
           <FacebookHistorySyncButton />
         </div>
       </div>

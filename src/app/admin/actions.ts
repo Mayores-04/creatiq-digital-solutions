@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireAdmin, requireModuleAccess } from "@/lib/crm/auth";
 import { ADMIN_MODULES, CONTENT_STATUSES, INQUIRY_STATUSES, LEAD_OUTCOMES, PROJECT_STATUSES, PROJECT_TYPES, TASK_STATUSES } from "@/lib/crm/constants";
 import { clearPublicSiteDataCache } from "@/lib/crm/public-data";
-import { assertFacebookPageConfig, facebookGraphPost, getFacebookConversationMessages, getFacebookPageConversations, sendFacebookMessengerText } from "@/lib/meta/facebook";
+import { assertFacebookPageConfig, facebookGraphPost, getFacebookConversationMessages, getFacebookPageConversations, getFacebookPagePosts, sendFacebookMessengerText } from "@/lib/meta/facebook";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { fetchWithSupabaseTimeout } from "@/lib/supabase/request";
@@ -875,6 +875,96 @@ export async function deleteContentPlannerItem(id: string): Promise<ActionResult
   }
 }
 
+export async function importFacebookPostsToContentPlanner(): Promise<ActionResult> {
+  try {
+    const identity = await requireModuleAccess("content-planner", ["ADMIN"]);
+    const posts = await getFacebookPagePosts(100);
+    const supabase = await createSupabaseServerClient();
+    let imported = 0;
+    let updated = 0;
+
+    for (const post of posts) {
+      const facebookId = post.id;
+      if (!facebookId) continue;
+
+      const createdAt = post.created_time ? new Date(post.created_time) : new Date();
+      const plannedFor = createdAt.toISOString().slice(0, 10);
+      const plannedTime = createdAt.toTimeString().slice(0, 5);
+      const copy = post.message ?? post.story ?? "Facebook Page post";
+      const title = firstLine(copy).slice(0, 170) || `Facebook post ${facebookId}`;
+      const image =
+        post.full_picture ??
+        post.attachments?.data?.[0]?.media?.image?.src ??
+        post.attachments?.data?.[0]?.subattachments?.data?.[0]?.media?.image?.src ??
+        null;
+
+      const { data: existing, error: lookupError } = await supabase
+        .from("content_planner_items")
+        .select("id")
+        .eq("automation_metadata->facebook->>source_post_id", facebookId)
+        .maybeSingle();
+
+      if (lookupError) throw new Error(lookupError.message);
+
+      const payload = {
+        title,
+        channel: "Facebook Page",
+        content_type: post.status_type?.replaceAll("_", " ") ?? "Page post",
+        status: "PUBLISHED",
+        planned_for: plannedFor,
+        planned_time: plannedTime,
+        planned_at: createdAt.toISOString(),
+        description: copy,
+        media_assets: image
+          ? [
+              {
+                id: `facebook-${facebookId}`,
+                url: image,
+                publicId: null,
+                provider: "external",
+                mimeType: "image/jpeg",
+                fileName: "facebook-post-image",
+                alt: title,
+              },
+            ]
+          : [],
+        platform_targets: ["facebook"],
+        automation_metadata: {
+          facebook: {
+            source: "facebook_page_import",
+            source_post_id: facebookId,
+            permalink_url: post.permalink_url,
+            status_type: post.status_type,
+            imported_at: new Date().toISOString(),
+            imported_by: identity.id,
+          },
+        },
+      };
+
+      const result = existing?.id
+        ? await supabase.from("content_planner_items").update(payload).eq("id", existing.id).select("id").single()
+        : await supabase.from("content_planner_items").insert({ ...payload, created_by: identity.id }).select("id").single();
+
+      if (result.error) throw new Error(result.error.message);
+      if (existing?.id) updated += 1;
+      else imported += 1;
+    }
+
+    await logActivity("content_planner", null, "facebook_posts_imported", {
+      imported,
+      updated,
+      scanned: posts.length,
+    });
+    refreshCrm();
+    return { ok: true, message: `Imported ${imported} Facebook posts and updated ${updated}.` };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to import Facebook posts.",
+    };
+  }
+}
+
 export async function publishContentPlannerItemToFacebook(id: string): Promise<ActionResult> {
   try {
     const identity = await requireModuleAccess("content-planner", ["ADMIN"]);
@@ -896,10 +986,14 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
     const mediaAssets = Array.isArray(item.media_assets)
       ? item.media_assets.flatMap((asset) => {
           if (!asset || typeof asset !== "object") return [];
-          const candidate = asset as { url?: unknown };
-          return typeof candidate.url === "string" && candidate.url ? [{ url: candidate.url }] : [];
+          const candidate = asset as { url?: unknown; mimeType?: unknown };
+          return typeof candidate.url === "string" && candidate.url
+            ? [{ url: candidate.url, mimeType: typeof candidate.mimeType === "string" ? candidate.mimeType : null }]
+            : [];
         })
       : [];
+    const videoAssets = mediaAssets.filter((asset) => asset.mimeType?.startsWith("video/"));
+    const imageAssets = mediaAssets.filter((asset) => !asset.mimeType?.startsWith("video/"));
 
     const plannedAt = item.planned_at ? new Date(String(item.planned_at)) : null;
     const scheduleAt =
@@ -916,10 +1010,14 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
     }
 
     let facebookPostId = "";
-    let publishMode: "feed" | "photo" | "multi_photo" | "scheduled_feed" | "scheduled_media" = scheduleSeconds ? "scheduled_feed" : "feed";
+    let publishMode: "feed" | "photo" | "multi_photo" | "video" | "scheduled_feed" | "scheduled_media" | "scheduled_video" = scheduleSeconds ? "scheduled_feed" : "feed";
     const schedulingFields: Record<string, string> = scheduleSeconds
       ? { published: "false", scheduled_publish_time: String(scheduleSeconds) }
       : {};
+
+    if (videoAssets.length > 1 || (videoAssets.length && imageAssets.length)) {
+      throw new Error("Facebook supports one video per post in this workflow. Use one video only, or use images only.");
+    }
 
     if (mediaAssets.length === 0) {
       const result = await facebookGraphPost<{ id: string }>(`${pageId}/feed`, {
@@ -927,10 +1025,19 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
         ...schedulingFields,
       });
       facebookPostId = result.id;
+    } else if (videoAssets.length === 1) {
+      publishMode = scheduleSeconds ? "scheduled_video" : "video";
+      const result = await facebookGraphPost<{ id: string; post_id?: string }>(`${pageId}/videos`, {
+        file_url: videoAssets[0].url,
+        description: message,
+        title: String(item.title || "Creatiq video post"),
+        ...(scheduleSeconds ? schedulingFields : { published: "true" }),
+      });
+      facebookPostId = result.post_id ?? result.id;
     } else if (mediaAssets.length === 1 && !scheduleSeconds) {
       publishMode = "photo";
       const result = await facebookGraphPost<{ id: string; post_id?: string }>(`${pageId}/photos`, {
-        url: mediaAssets[0].url,
+        url: imageAssets[0].url,
         caption: message,
         published: "true",
       });
@@ -938,7 +1045,7 @@ export async function publishContentPlannerItemToFacebook(id: string): Promise<A
     } else {
       publishMode = scheduleSeconds ? "scheduled_media" : "multi_photo";
       const uploaded = await Promise.all(
-        mediaAssets.slice(0, 10).map((asset) =>
+        imageAssets.slice(0, 10).map((asset) =>
           facebookGraphPost<{ id: string }>(`${pageId}/photos`, {
             url: asset.url,
             published: "false",
@@ -1173,6 +1280,13 @@ function isDuplicateDbError(error: { code?: string; message?: string }) {
 
 function messageText(message: { message?: string; attachments?: { data?: unknown[] } }) {
   return message.message?.trim() || (message.attachments?.data?.length ? "[Attachment]" : "");
+}
+
+function firstLine(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? "";
 }
 
 export async function updateMyProfile(values: { fullName: string; jobTitle?: string }): Promise<ActionResult> {
