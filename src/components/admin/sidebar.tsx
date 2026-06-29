@@ -85,13 +85,13 @@ const links = [
   //   group: "Growth",
   //   module: "facebook",
   // },
-  {
-    href: "/admin/facebook/messages",
-    label: "Messenger Inbox",
-    icon: MessagesSquare,
-    group: "Growth",
-    module: "facebook",
-  },
+  // {
+  //   href: "/admin/facebook/messages",
+  //   label: "Messenger Inbox",
+  //   icon: MessagesSquare,
+  //   group: "Growth",
+  //   module: "facebook",
+  // },
   {
     href: "/admin/reviews",
     label: "Customer Reviews",
