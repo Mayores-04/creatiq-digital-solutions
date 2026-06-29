@@ -78,13 +78,13 @@ const links = [
     group: "Growth",
     module: "content-planner",
   },
-  {
-    href: "/admin/facebook/posts",
-    label: "Page Uploads",
-    icon: Images,
-    group: "Growth",
-    module: "facebook",
-  },
+  // {
+  //   href: "/admin/facebook/posts",
+  //   label: "Page Uploads",
+  //   icon: Images,
+  //   group: "Growth",
+  //   module: "facebook",
+  // },
   {
     href: "/admin/facebook/messages",
     label: "Messenger Inbox",
