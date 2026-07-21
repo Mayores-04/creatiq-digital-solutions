@@ -259,8 +259,6 @@ export function ComingSoonScene() {
 
             <div className="pointer-events-none absolute inset-x-0 top-0 bottom-[9.5rem] bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(2,11,31,0.04)_48%,rgba(2,11,31,0.72)_100%)] sm:bottom-[10.25rem]" />
 
-            <div className="pointer-events-none absolute left-1/2 top-[38%] h-52 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/10 bg-cyan-300/[0.025] shadow-[0_0_80px_rgba(34,211,238,0.08)]" />
-
             {/* Progress panel */}
             <div className="absolute bottom-5 left-5 right-5 rounded-[1.5rem] border border-cyan-300/15 bg-[#03132d]/90 p-5 shadow-[0_0_48px_rgba(8,189,255,0.14)] backdrop-blur-xl sm:bottom-7 sm:left-7 sm:right-7">
               <div className="flex items-center justify-between gap-4">
