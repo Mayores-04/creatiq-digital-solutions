@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PUBLIC_GATE_ENABLED =
+  process.env.COMING_SOON_MODE !== "false" &&
   process.env.NEXT_PUBLIC_COMING_SOON_MODE !== "false";
+
+const ACCESS_QUERY_PARAM = "preview_key";
+const ACCESS_COOKIE = "creatiq_preview_access";
+const ACCESS_TOKEN = process.env.COMING_SOON_ACCESS_TOKEN?.trim();
 
 const PUBLIC_FILE = /\.(.*)$/;
 
-function isAllowedPath(pathname: string) {
+function isAlwaysAllowedPath(pathname: string) {
   return (
     pathname === "/coming-soon" ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/auth") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/images") ||
@@ -23,6 +26,42 @@ function isAllowedPath(pathname: string) {
   );
 }
 
+function hasValidPreviewAccess(request: NextRequest) {
+  if (!ACCESS_TOKEN) return false;
+
+  return request.cookies.get(ACCESS_COOKIE)?.value === ACCESS_TOKEN;
+}
+
+function hasValidPreviewKey(request: NextRequest) {
+  if (!ACCESS_TOKEN) return false;
+
+  return request.nextUrl.searchParams.get(ACCESS_QUERY_PARAM) === ACCESS_TOKEN;
+}
+
+function createPreviewResponse(request: NextRequest) {
+  const nextUrl = request.nextUrl.clone();
+
+  nextUrl.searchParams.delete(ACCESS_QUERY_PARAM);
+
+  if (nextUrl.pathname === "/coming-soon") {
+    nextUrl.pathname = "/";
+  }
+
+  const response = NextResponse.redirect(nextUrl);
+
+  response.cookies.set({
+    name: ACCESS_COOKIE,
+    value: ACCESS_TOKEN ?? "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: request.nextUrl.protocol === "https:",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
+  return response;
+}
+
 export function proxy(request: NextRequest) {
   if (!PUBLIC_GATE_ENABLED) {
     return NextResponse.next();
@@ -30,7 +69,11 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (isAllowedPath(pathname)) {
+  if (hasValidPreviewKey(request)) {
+    return createPreviewResponse(request);
+  }
+
+  if (isAlwaysAllowedPath(pathname) || hasValidPreviewAccess(request)) {
     return NextResponse.next();
   }
 
